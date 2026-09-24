@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Inline so the project stays free of binary assets. -->
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%230b0b0f'/><g fill='%23d8c9a3'><rect x='5' y='15' width='6' height='12'/><rect x='13' y='8' width='6' height='19'/><rect x='21' y='18' width='6' height='9'/></g></svg>"
+    />
+    <title>Lost Heaven</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #0b0b0f;
+        color: #e8e4da;
+        font:
+          14px/1.5 'Georgia',
+          'Times New Roman',
+          serif;
+        user-select: none;
+      }
+
+      #gl {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+
+      #overlay {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-content: center;
+        gap: 1.25rem;
+        text-align: center;
+        background: rgba(10, 10, 14, 0.72);
+        backdrop-filter: blur(3px);
+        cursor: pointer;
+      }
+
+      #overlay[hidden] {
+        display: none;
+      }
+
+      #overlay h1 {
+        margin: 0;
+        font-size: 2.75rem;
+        letter-spacing: 0.32em;
+        text-transform: uppercase;
+        color: #d8c9a3;
+      }
+
+      #overlay .tagline {
+        margin: -0.75rem 0 0;
+        letter-spacing: 0.18em;
+        color: #8e887a;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+      }
+
+      #overlay .keys {
+        display: grid;
+        grid-template-columns: auto auto;
+        gap: 0.35rem 1.5rem;
+        margin: 0 auto;
+        font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+        font-size: 0.8rem;
+        color: #b6b0a2;
+      }
+
+      #overlay .keys dt {
+        text-align: right;
+        color: #d8c9a3;
+      }
+
+      #overlay .keys dd {
+        margin: 0;
+        text-align: left;
+      }
+
+      #overlay .prompt {
+        color: #e8e4da;
+        letter-spacing: 0.1em;
+      }
+
+      #overlay.error .prompt {
+        color: #e2756a;
+      }
+
+      #hud {
+        position: fixed;
+        left: 12px;
+        bottom: 10px;
+        font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+        font-size: 11px;
+        color: rgba(232, 228, 218, 0.72);
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+        pointer-events: none;
+        white-space: pre;
+      }
+
+      #crosshair {
+        position: fixed;
+        left: 50%;
+        top: 50%;
+        width: 4px;
+        height: 4px;
+        margin: -2px 0 0 -2px;
+        border-radius: 50%;
+        background: rgba(232, 228, 218, 0.55);
+        pointer-events: none;
+      }
+
+      #crosshair[hidden] {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="gl"></canvas>
+    <div id="crosshair" hidden></div>
+    <div id="hud"></div>
+
+    <div id="overlay">
+      <h1>Lost Heaven</h1>
+      <p class="tagline">Phase I &mdash; the city</p>
+      <dl class="keys">
+        <dt>W A S D</dt>
+        <dd>walk</dd>
+        <dt>Mouse</dt>
+        <dd>look</dd>
+        <dt>Shift</dt>
+        <dd>run</dd>
+        <dt>F</dt>
+        <dd>toggle fly mode</dd>
+        <dt>Space / C</dt>
+        <dd>up / down (fly)</dd>
+        <dt>Esc</dt>
+        <dd>release cursor</dd>
+      </dl>
+      <p class="prompt" id="prompt">Click to enter the city</p>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
