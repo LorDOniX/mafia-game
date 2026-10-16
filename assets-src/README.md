@@ -22,3 +22,21 @@ Deliberately unused for now:
 - `_Roughness.jpg`, `_AmbientOcclusion.jpg`, `_Displacement.jpg` — no home until
   the shader grows a material model beyond diffuse + normal.
 - `.blend`, `.usdc`, `.mtlx`, `.tres` — DCC/engine project files.
+
+## textures/facades — granite-grid
+
+Photograph of a granite-clad facade, 9 x 7 window bays. Cropped to the exact
+bay grid into `public/textures/facades/granite-grid.jpg`; the crop command is
+in the main README under "Custom facades".
+
+## models/kenney-car-kit — Kenney "Car Kit" 3.1
+
+Licence: CC0 (public domain), <https://kenney.nl/assets/car-kit>. `License.txt`
+is the copy shipped with the kit; `ambulance-preview.png` is its preview render.
+
+In use (see `VEHICLE` in `src/city/assets.ts`):
+
+- `public/models/ambulance.glb` + `public/models/Textures/colormap.png`. The
+  .glb references the colour map by that relative path, so the two must keep
+  that layout. Every model in the kit shares the same `colormap.png`, so any
+  other car from it drops in by changing `VEHICLE.url`.

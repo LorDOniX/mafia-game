@@ -72,6 +72,18 @@ export class CityCollision {
     return false;
   }
 
+  /** True if a circle at (x, z) overlaps a building or reaches past the map edge. */
+  blocked(x: number, z: number, radius: number): boolean {
+    const { bounds } = this;
+    return (
+      x - radius < bounds.minX ||
+      x + radius > bounds.maxX ||
+      z - radius < bounds.minZ ||
+      z + radius > bounds.maxZ ||
+      this.overlaps(x, z, radius)
+    );
+  }
+
   /**
    * Slides a circle from its current position toward a target.
    *

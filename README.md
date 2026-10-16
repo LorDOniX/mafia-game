@@ -14,17 +14,29 @@ Click the canvas to capture the mouse, `Esc` to release it.
 
 ## Controls
 
-| Input       | Action                 |
-| ----------- | ---------------------- |
-| `W A S D`   | Walk                   |
-| Mouse       | Look                   |
-| `Shift`     | Run                    |
-| `F`         | Toggle walk / fly mode |
-| `Space` `C` | Up / down (fly only)   |
-| `Esc`       | Release the cursor     |
+| Input       | Action                  |
+| ----------- | ----------------------- |
+| `W A S D`   | Walk                    |
+| Mouse       | Look                    |
+| `Shift`     | Run                     |
+| `F`         | Toggle walk / fly mode  |
+| `Space` `C` | Up / down (fly only)    |
+| `E`         | Get in / out of the car |
+| `Esc`       | Release the cursor      |
 
 Walk mode holds the camera at eye height and collides with buildings. Fly mode
 is unconstrained, for looking at the city from above.
+
+A car is parked just ahead of the spawn point. Walk up to it and press `E`:
+
+| Input   | Action                                 |
+| ------- | -------------------------------------- |
+| `W`     | Accelerate                             |
+| `S`     | Brake, then reverse                    |
+| `A` `D` | Steer                                  |
+| `Space` | Handbrake                              |
+| Mouse   | Look around; recentres once you drive  |
+| `E`     | Get out (driver's side when it's free) |
 
 ## Scripts
 
@@ -48,12 +60,14 @@ src/
     input.ts       keyboard + pointer-lock mouse look
     camera.ts      yaw/pitch camera, view & projection matrices
     controller.ts  first-person movement, walk and fly modes
+    drive.ts       driving input, getting in and out, chase camera
     rng.ts         seeded deterministic PRNG
   city/
     assets.ts      texture + sky manifest; swap procedural art for PNGs here
     layout.ts      city generation: blocks, plots, buildings (no GL, no DOM)
     mesh.ts        layout -> interleaved vertex + index buffers
     collision.ts   uniform-grid building lookup, ground height
+    facades.ts     custom facades: definition and assignment to buildings
     textures.ts    procedural surface textures (Canvas2D)
     sky.ts         procedural sky cube map + the shared sun direction
   gfx/
@@ -61,10 +75,15 @@ src/
     shader.ts      compile/link with real logs, reflects uniforms & attributes
     buffer.ts      VBO + VAO helpers
     mesh.ts        indexed static mesh from an interleaved buffer
-    texture.ts     2D-array and cube-map upload, anisotropic filtering
+    texture.ts     2D-array, 2D and cube-map upload, anisotropic filtering
+    gltf.ts        minimal binary glTF (.glb) loader
+    model.ts       model pass: draws loaded models with the city's lighting
     image.ts       image fetch/decode, rescaling, bilinear resampling
     skybox.ts      skybox pass
     renderer.ts    city pass + skybox pass
+  vehicle/
+    vehicle.ts     arcade car handling and collision (no GL, no DOM)
+    model.ts       measures a car off its model, poses body and wheels
   math/            vec2 / vec3 / mat4, column-major to match GL
   game/state.ts    mafia domain model (roles, phases, win condition)
   shaders/         GLSL sources, imported via `?raw`
@@ -120,8 +139,11 @@ Notes that matter in practice:
   with a content hash, which is useless for art you address by name.
 - **Anything you leave out stays procedural**, and a URL that fails to load
   warns to the console and falls back. A typo degrades; it does not break.
-- **Images are rescaled to `TEXTURE_SIZE`** (512) so every array layer matches.
-  Raise that constant if you want more detail from photographic art.
+- **Images are rescaled to `TEXTURE_SIZE`** (2048) so every array layer matches.
+  Each layer costs about 21 MB of GPU memory per array at that size; drop it to
+  1024 if that is too much. The procedural textures are drawn in fixed art
+  units (`ART_SIZE`), so changing it sharpens or softens them without changing
+  their look.
 - **Seamless, tiling textures only.** Everything is sampled with `REPEAT` across
   large surfaces, so a non-tiling photo will show a visible grid.
 - **Facades get a window painted on top.** The mesh maps one tile to one storey
@@ -156,6 +178,7 @@ Intersections sample the `Road` texture through `CLEAN_ROAD_UV` in
 `city/mesh.ts` — a marking-free window on the image. An intersection is exactly
 one tile across and never repeats, so it can crop freely with no seam to match.
 If your road texture puts its clean asphalt somewhere else, move that window.
+UVs follow GL convention, with v = 0 at the bottom of the image.
 
 ### Normal maps
 
@@ -179,6 +202,62 @@ roadway is viewed at grazing angles where strong normals read as noise.
 Tangent frames are solved per quad from the geometry and UVs
 (`tangentFrame` in `city/mesh.ts`), so normal maps work on walls, roofs,
 pavements and carriageways without any per-surface setup.
+
+### Custom facades for individual buildings
+
+`SURFACE_TEXTURES` swaps a texture everywhere it is used. To give one building
+(or a chosen group) a look of its own, add an entry to `CUSTOM_FACADES` in the
+same file:
+
+```ts
+export const CUSTOM_FACADES: readonly CustomFacade[] = [
+  {
+    name: 'granite-grid',
+    url: '/textures/facades/granite-grid.jpg',
+    span: { bays: 9, storeys: 7 },
+    targets: [{ at: { x: 328, z: 327 } }],
+  },
+];
+```
+
+Every entry gets its own texture-array layer, appended after the built-in
+ones, so adding a facade never touches the others. The fields:
+
+- **`span`** is how many window bays across and storeys up the image covers.
+  Unlike the built-in facades (one bay per tile), a custom facade can be a whole
+  photographed wall; the walls are mapped so one bay of the image lands on one
+  bay of the building (about 4 m wide, one storey high).
+- **`targets`** picks the buildings. `{ at: { x, z } }` is the building
+  standing on that ground point — walk up to it and read `x` / `z` off the HUD.
+  `{ where: (building, index) => boolean }` takes any predicate, e.g. every
+  building taller than 30 m. When two facades target the same building, the
+  later entry wins; a target that matches nothing warns in the console.
+- **`tint`** defaults to white, because photographs carry their own colour.
+- **`normalUrl`** is optional, OpenGL convention, same as `SURFACE_NORMAL_MAPS`.
+
+Preparing the image:
+
+- **Crop it to exactly `bays` x `storeys` bays**, cutting through the middle of
+  the wall between windows, so the left edge continues into the right edge and
+  the top into the bottom. Otherwise the repeats show a seam or a half window.
+- **Shoot it straight on.** Perspective makes the rows drift apart toward one
+  edge, and the drift shows up as a jump at every repeat.
+- **Prefer JPG / PNG over AVIF / WebP** for safety: decoding goes through the
+  browser, and older browsers do not decode every format.
+- Images are rescaled to `TEXTURE_SIZE` square like any other layer, so a
+  9-bay image gets about a ninth of it per bay. Raise `TEXTURE_SIZE` if that
+  is too soft.
+
+If the image fails to load, the building keeps the custom layout but shows
+procedural stucco instead, tiled to the same bay grid.
+
+The shipped `granite-grid.jpg` is cropped from
+`assets-src/textures/facades/granite-grid.avif` with:
+
+```bash
+ffmpeg -i assets-src/textures/facades/granite-grid.avif -vf "crop=2134:1654:54:53" \
+  -q:v 3 public/textures/facades/granite-grid.jpg
+```
 
 ### Using your own sky
 
@@ -214,9 +293,53 @@ conversion happens on the CPU at startup, and an 8K source means a ~134 MB
 intermediate buffer. `.hdr` and `.exr` are not supported - use the tonemapped
 JPG/PNG that most sites offer alongside them.
 
+### The car
+
+The car is a binary glTF model, set by `VEHICLE` in `src/city/assets.ts`:
+
+```ts
+export const VEHICLE: VehicleModelConfig = {
+  url: '/models/ambulance.glb',
+  scale: 1.4,
+  spinPrefix: 'wheel-',
+  steerPrefix: 'wheel-front',
+};
+```
+
+- **Size, wheelbase and wheel radius are measured off the model**, so swapping
+  models needs no tuning beyond `scale`, which converts model units to metres.
+  Kenney's cars are about 1.5 units wide, so 1.4 gives a 2.1 m wide ambulance.
+- **Wheels are found by part name.** Every mesh node whose name starts with
+  `spinPrefix` rolls, and those also starting with `steerPrefix` steer. Each
+  wheel turns around its own node origin, so that origin has to sit on the
+  axle. Kenney's kit names them `wheel-front-left`, `wheel-back-right`, etc.
+- **The model faces +Z with +Y up**, the glTF convention.
+- **Textures load relative to the model file**, as glTF specifies. A model
+  that references `Textures/colormap.png` needs that file next to it in
+  `public/models/`. Embedded textures work too.
+- If the model fails to load, the game warns in the console and runs without
+  a car.
+
+The loader (`gfx/gltf.ts`) reads `.glb` only, and only what a prop needs:
+triangle meshes with positions, normals and one UV set, the node hierarchy, and
+one base-colour texture per model. It throws with a reason on anything it
+cannot honour (Draco compression, external `.bin` files, quantised attributes)
+rather than drawing it wrong. Re-export such models from Blender as `.glb`
+with compression off.
+
+Handling is a kinematic bicycle model in `vehicle/vehicle.ts`: speed along the
+heading, turn rate from steering angle over wheelbase. There is no physics
+engine; the car collides as a row of circles down its long axis, and scrapes
+along walls it hits at an angle. Tune it with `DEFAULT_HANDLING` (top speed,
+acceleration, steering lock and so on).
+
+The kit's other cars (`sedan`, `taxi`, `police`, `truck`, ...) share the same
+colour map, so any of them drops in by changing `url`.
+
 ### Where to get textures
 
-Already in use: the roadway is ambientCG's
+Already in use: the car is Kenney's
+[Car Kit](https://kenney.nl/assets/car-kit) (CC0), and the roadway is ambientCG's
 [Road008B](https://ambientcg.com/view?id=Road008B) (CC0). The full pack is kept
 in `assets-src/textures/road/`; only the Color and NormalGL maps are served.
 
@@ -263,6 +386,9 @@ Licences do change. Verify before relying on any of the above commercially.
 - One world unit is one metre.
 - Y is up; yaw 0 looks down -Z.
 - `strict` TypeScript with `noUncheckedIndexedAccess` — index access is `T | undefined`.
+- Surface textures are uploaded with `UNPACK_FLIP_Y_WEBGL`, so v = 0 is the
+  bottom row of the image and art stands upright on walls. The sky cube map is
+  not flipped; cube faces follow their own convention.
 - Textures are uploaded as `RGBA8` and shaded as if they were linear. That is
   not colour-correct for sRGB source art, but it is what the procedural
   textures were authored against. Moving to `SRGB8_ALPHA8` plus an encode on

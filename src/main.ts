@@ -6,7 +6,12 @@ import { Camera } from '@/core/camera';
 import { FirstPersonController } from '@/core/controller';
 import { generateCity } from '@/city/layout';
 import { CityCollision } from '@/city/collision';
-import { loadCityAssets } from '@/city/assets';
+import { CUSTOM_FACADES, loadCityAssets, loadVehicleModel, VEHICLE } from '@/city/assets';
+import { applyCustomFacades } from '@/city/facades';
+import { DriveController } from '@/core/drive';
+import { PARKED, Vehicle } from '@/vehicle/vehicle';
+import { fitVehicle, vehiclePose, vehicleTransform } from '@/vehicle/model';
+import type { ModelInstance } from '@/gfx/model';
 
 const HUD_INTERVAL = 0.25;
 
@@ -23,6 +28,7 @@ async function main(): Promise<void> {
 
   const ctx = createContext(canvas);
   const layout = generateCity();
+  applyCustomFacades(layout, CUSTOM_FACADES);
   const collision = new CityCollision(layout);
 
   const camera = new Camera();
@@ -41,10 +47,20 @@ async function main(): Promise<void> {
   // renderer itself stays synchronous.
   const defaultPrompt = prompt.textContent ?? 'Click to enter the city';
   prompt.textContent = 'Building Lost Heaven\u2026';
-  const assets = await loadCityAssets();
+  const [assets, carModel] = await Promise.all([loadCityAssets(), loadVehicleModel()]);
   prompt.textContent = defaultPrompt;
 
   const renderer = new Renderer(ctx, layout, assets);
+
+  // Parked just past the spawn crossroads, in the right-hand lane of the
+  // avenue the player starts out looking down.
+  const car = carModel && {
+    fit: fitVehicle(carModel.data, VEHICLE),
+    model: renderer.createModel(carModel),
+  };
+  const vehicle = car && new Vehicle(car.fit.body, spawn - 2, spawn + 20, Math.PI);
+  const drive = new DriveController(camera, input, collision);
+  let driving = false;
 
   // A denied lock request (no user gesture, or the cooldown right after Esc)
   // would otherwise read as a dead click.
@@ -60,8 +76,38 @@ async function main(): Promise<void> {
   let fps = 0;
 
   startLoop(({ dt, elapsed }) => {
-    controller.update(dt);
-    renderer.render(camera);
+    if (vehicle && input.wasPressed('KeyE')) {
+      if (driving) {
+        const exit = drive.exitPoint(vehicle);
+        if (exit) {
+          driving = false;
+          controller.teleport(exit.x, exit.z, vehicle.heading);
+        }
+      } else if (
+        controller.mode === 'walk' &&
+        drive.canEnter(vehicle, camera.position.x, camera.position.z)
+      ) {
+        driving = true;
+        drive.enter(vehicle);
+      }
+    }
+
+    // The car keeps simulating when empty, so one left rolling coasts to a stop.
+    vehicle?.update(dt, driving ? drive.controls() : PARKED, collision);
+    if (vehicle && driving) drive.updateCamera(dt, vehicle);
+    else controller.update(dt);
+
+    const instances: ModelInstance[] =
+      car && vehicle
+        ? [
+            {
+              model: car.model,
+              transform: vehicleTransform(vehicle, car.fit),
+              pose: vehiclePose(vehicle, VEHICLE),
+            },
+          ]
+        : [];
+    renderer.render(camera, instances);
     input.endFrame();
 
     const locked = input.pointerLocked;
@@ -77,7 +123,7 @@ async function main(): Promise<void> {
       const p = camera.position;
       hud.textContent =
         `${fps.toFixed(0)} fps  |  ${renderer.stats.triangles.toLocaleString()} tris  |  ` +
-        `${controller.mode}  |  x ${p.x.toFixed(1)}  y ${p.y.toFixed(1)}  z ${p.z.toFixed(1)}  |  ` +
+        `${driving && vehicle ? `drive ${Math.abs(vehicle.speed * 3.6).toFixed(0)} km/h` : controller.mode}  |  x ${p.x.toFixed(1)}  y ${p.y.toFixed(1)}  z ${p.z.toFixed(1)}  |  ` +
         `${elapsed.toFixed(0)}s`;
     }
   });

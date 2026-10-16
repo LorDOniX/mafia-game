@@ -104,3 +104,89 @@ export function multiply(a: Mat4, b: Mat4, out: Mat4 = new Float32Array(16)): Ma
   }
   return out;
 }
+
+export function scaling(s: number, out: Mat4 = identity()): Mat4 {
+  identity(out);
+  out[0] = s;
+  out[5] = s;
+  out[10] = s;
+  return out;
+}
+
+/** Rotation about +X. Positive angles turn +Y toward +Z. */
+export function rotationX(angle: number, out: Mat4 = identity()): Mat4 {
+  const c = Math.cos(angle);
+  const s = Math.sin(angle);
+  identity(out);
+  out[5] = c;
+  out[6] = s;
+  out[9] = -s;
+  out[10] = c;
+  return out;
+}
+
+/** Rotation about +Y. Positive angles turn +Z toward +X. */
+export function rotationY(angle: number, out: Mat4 = identity()): Mat4 {
+  const c = Math.cos(angle);
+  const s = Math.sin(angle);
+  identity(out);
+  out[0] = c;
+  out[2] = -s;
+  out[8] = s;
+  out[10] = c;
+  return out;
+}
+
+/**
+ * Translation * rotation * scale, the order glTF composes a node's TRS in.
+ * `rotation` is a unit quaternion as [x, y, z, w].
+ */
+export function fromTRS(
+  translation: readonly number[],
+  rotation: readonly number[],
+  scale: readonly number[],
+  out: Mat4 = new Float32Array(16),
+): Mat4 {
+  const [x = 0, y = 0, z = 0, w = 1] = rotation;
+  const [sx = 1, sy = 1, sz = 1] = scale;
+  const x2 = x + x;
+  const y2 = y + y;
+  const z2 = z + z;
+  const xx = x * x2;
+  const xy = x * y2;
+  const xz = x * z2;
+  const yy = y * y2;
+  const yz = y * z2;
+  const zz = z * z2;
+  const wx = w * x2;
+  const wy = w * y2;
+  const wz = w * z2;
+
+  out[0] = (1 - (yy + zz)) * sx;
+  out[1] = (xy + wz) * sx;
+  out[2] = (xz - wy) * sx;
+  out[3] = 0;
+  out[4] = (xy - wz) * sy;
+  out[5] = (1 - (xx + zz)) * sy;
+  out[6] = (yz + wx) * sy;
+  out[7] = 0;
+  out[8] = (xz + wy) * sz;
+  out[9] = (yz - wx) * sz;
+  out[10] = (1 - (xx + yy)) * sz;
+  out[11] = 0;
+  out[12] = translation[0] ?? 0;
+  out[13] = translation[1] ?? 0;
+  out[14] = translation[2] ?? 0;
+  out[15] = 1;
+  return out;
+}
+
+/** Applies `m` to a point (w = 1). */
+export function transformPoint(m: Mat4, p: Vec3): Vec3 {
+  const at = (i: number): number => m[i] ?? 0;
+  return {
+    x: at(0) * p.x + at(4) * p.y + at(8) * p.z + at(12),
+    y: at(1) * p.x + at(5) * p.y + at(9) * p.z + at(13),
+    z: at(2) * p.x + at(6) * p.y + at(10) * p.z + at(14),
+  };
+}

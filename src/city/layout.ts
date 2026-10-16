@@ -22,10 +22,29 @@ export const TextureLayer = {
 
 export type TextureLayer = (typeof TextureLayer)[keyof typeof TextureLayer];
 
+/** Built-in layers come first in the texture array; custom facades follow. */
+export const BUILTIN_LAYER_COUNT = Object.keys(TextureLayer).length;
+
+/**
+ * Any layer of the surface texture array: a built-in `TextureLayer`, or a
+ * custom facade appended after them (see `city/facades.ts`).
+ */
+export type SurfaceLayer = number;
+
+/** How much of a facade one repeat of its texture covers. */
+export interface FacadeSpan {
+  /** Window bays across the image. */
+  bays: number;
+  /** Storeys up the image. */
+  storeys: number;
+}
+
 export interface Building {
   footprint: Rect;
   height: number;
-  facade: TextureLayer;
+  facade: SurfaceLayer;
+  /** Absent means one bay by one storey, which is how built-in facades are drawn. */
+  facadeSpan?: FacadeSpan;
   tint: [number, number, number];
 }
 

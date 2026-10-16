@@ -2,6 +2,8 @@ import { createProgram, type Program } from './shader';
 import { createMesh, type Mesh } from './mesh';
 import { createTextureArray } from './texture';
 import { Skybox } from './skybox';
+import { ModelPass, type Lighting, type Model, type ModelInstance } from './model';
+import type { LoadedModel } from './gltf';
 import { buildCityMesh } from '@/city/mesh';
 import { TEXTURE_SIZE } from '@/city/textures';
 import { NORMAL_STRENGTH, type CityAssets } from '@/city/assets';
@@ -30,6 +32,7 @@ export class Renderer {
   private readonly atlas: WebGLTexture;
   private readonly normals: WebGLTexture;
   private readonly skybox: Skybox;
+  private readonly models: ModelPass;
   private readonly sky: CityAssets['sky'];
 
   readonly stats: RenderStats;
@@ -59,6 +62,7 @@ export class Renderer {
     this.stats = { triangles: data.indices.length / 3 };
 
     this.skybox = new Skybox(gl, assets.sky.faces);
+    this.models = new ModelPass(gl);
 
     gl.enable(gl.DEPTH_TEST);
     gl.depthFunc(gl.LESS);
@@ -68,7 +72,11 @@ export class Renderer {
     gl.clearColor(horizon[0], horizon[1], horizon[2], 1);
   }
 
-  render(camera: Camera): void {
+  createModel(loaded: LoadedModel): Model {
+    return this.models.createModel(loaded);
+  }
+
+  render(camera: Camera, instances: readonly ModelInstance[] = []): void {
     const { gl } = this;
 
     if (this.ctx.resize()) {
@@ -102,6 +110,16 @@ export class Renderer {
     gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.normals);
 
     this.city.draw();
+
+    const lighting: Lighting = {
+      cameraPos: camera.position,
+      sunDir: this.sky.sunDirection,
+      sunColor: SUN_COLOR,
+      ambient: AMBIENT,
+      fogColor: this.sky.horizonColor,
+      fogDensity: FOG_DENSITY,
+    };
+    this.models.render(camera.viewProjection, lighting, instances);
 
     this.skybox.render(camera.view, camera.projection);
   }

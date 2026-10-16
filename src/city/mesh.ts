@@ -1,4 +1,10 @@
-import { TextureLayer, type CityLayout, type Rect } from './layout';
+import {
+  TextureLayer,
+  type CityLayout,
+  type FacadeSpan,
+  type Rect,
+  type SurfaceLayer,
+} from './layout';
 
 /** position(3) + normal(3) + tangent(4) + uv(2) + layer(1) + tint(3) */
 export const FLOATS_PER_VERTEX = 16;
@@ -13,6 +19,9 @@ type UV = [number, number];
 type Tint = readonly [number, number, number];
 
 const WHITE: Tint = [1, 1, 1];
+
+/** Built-in facades are drawn one window bay and one storey per tile. */
+const SINGLE_BAY: FacadeSpan = { bays: 1, storeys: 1 };
 
 /** World metres covered by one tile of each freely-tiled texture. */
 const ASPHALT_TILE = 6;
@@ -43,8 +52,11 @@ const GROUND_PLANE_Y = -0.04;
  * Intersections are exactly one tile across and never repeat, so they can
  * sample an arbitrary sub-rectangle without any seam to worry about — which is
  * how they get clean asphalt out of a texture that has lines painted on it.
+ *
+ * Measured in UV space, where v = 0 is the bottom of the image: this window
+ * starts 8% down from the top of Road008B.
  */
-const CLEAN_ROAD_UV = { u0: 0.1, v0: 0.08, u1: 0.44, v1: 0.42 };
+const CLEAN_ROAD_UV = { u0: 0.1, v0: 0.58, u1: 0.44, v1: 0.92 };
 
 /** Height over which baked corner shading fades out, in metres. */
 const AO_HEIGHT = 7;
@@ -69,7 +81,7 @@ class MeshBuilder {
     corners: Triple[],
     normal: Triple,
     uvs: UV[],
-    layer: TextureLayer,
+    layer: SurfaceLayer,
     tint: Tint,
     shade = false,
   ): void {
@@ -202,7 +214,7 @@ class MeshBuilder {
     y1: number,
     uvW: number,
     uvH: number,
-    layer: TextureLayer,
+    layer: SurfaceLayer,
     tint: Tint,
   ): void {
     const dx = x1 - x0;
@@ -365,10 +377,20 @@ export function buildCityMesh(layout: CityLayout): MeshData {
     );
 
     for (const building of block.buildings) {
-      const { footprint, height, facade, tint } = building;
+      const { footprint, height, facade, tint, facadeSpan = SINGLE_BAY } = building;
       const floors = Math.max(1, Math.round(height / config.floorHeight));
 
-      addPerimeterWalls(builder, footprint, 0, height, facade, tint, undefined, floors);
+      addPerimeterWalls(
+        builder,
+        footprint,
+        0,
+        height,
+        facade,
+        tint,
+        undefined,
+        floors / facadeSpan.storeys,
+        facadeSpan.bays,
+      );
       builder.ground(footprint, height, TextureLayer.Roof, ROOF_TILE);
     }
   }
@@ -439,17 +461,21 @@ function addPerimeterWalls(
   rect: Rect,
   y0: number,
   y1: number,
-  layer: TextureLayer,
+  layer: SurfaceLayer,
   tint: Tint,
   uvPerMetre: number | undefined,
   uvH: number,
+  baysPerTile = 1,
 ): void {
   const width = rect.maxX - rect.minX;
   const depth = rect.maxZ - rect.minZ;
 
-  // Facades tile one texture per storey; kerbs take an explicit density.
-  const tilesX = uvPerMetre !== undefined ? width * uvPerMetre : Math.max(1, Math.round(width / 4));
-  const tilesZ = uvPerMetre !== undefined ? depth * uvPerMetre : Math.max(1, Math.round(depth / 4));
+  // Facades fit a whole number of window bays to each wall, so a texture that
+  // spans several bays still starts and ends on a bay boundary; kerbs take an
+  // explicit density.
+  const bays = (length: number): number => Math.max(1, Math.round(length / 4)) / baysPerTile;
+  const tilesX = uvPerMetre !== undefined ? width * uvPerMetre : bays(width);
+  const tilesZ = uvPerMetre !== undefined ? depth * uvPerMetre : bays(depth);
 
   builder.wall(rect.maxX, rect.minZ, rect.minX, rect.minZ, y0, y1, tilesX, uvH, layer, tint);
   builder.wall(rect.minX, rect.minZ, rect.minX, rect.maxZ, y0, y1, tilesZ, uvH, layer, tint);

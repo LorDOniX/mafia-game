@@ -4,12 +4,21 @@ import { TextureLayer } from './layout';
 /**
  * Edge length of every layer in the surface texture array.
  *
- * All layers must match, so downloaded art is rescaled to this. Raise it if you
- * swap in photographic textures and want more detail than 1024 carries; cost is
- * 6 * size^2 * 4 bytes plus a third again for mipmaps, for each of the colour
- * and normal arrays.
+ * All layers must match, so downloaded art is rescaled to this. Each layer
+ * costs size^2 * 4 bytes plus a third again for mipmaps — about 21 MB at 2048 —
+ * in each of the colour and normal arrays, for every built-in layer and every
+ * custom facade. Drop it to 1024 if GPU memory is tight.
  */
-export const TEXTURE_SIZE = 1024;
+export const TEXTURE_SIZE = 2048;
+
+/**
+ * Coordinate space the procedural art is drawn in.
+ *
+ * Stroke widths, insets and blotch sizes below are in these units, and each
+ * canvas is scaled from them up to TEXTURE_SIZE, so raising the resolution
+ * sharpens the procedural textures rather than shrinking their detail.
+ */
+const ART_SIZE = 1024;
 
 /**
  * Every surface texture is drawn procedurally so the project needs no binary
@@ -17,7 +26,7 @@ export const TEXTURE_SIZE = 1024;
  * so any seam would show up as a visible grid across the city.
  *
  * To move to authored art later, replace this function with image loading —
- * the renderer only needs `TextureLayer.length` canvases of equal size.
+ * the renderer only needs one TEXTURE_SIZE canvas per layer.
  */
 export function createSurfaceTextures(): HTMLCanvasElement[] {
   const textures: HTMLCanvasElement[] = [];
@@ -40,7 +49,7 @@ export function createSurfaceTextures(): HTMLCanvasElement[] {
 export function createFlatNormalMap(): HTMLCanvasElement {
   const { canvas, ctx } = createCanvas();
   ctx.fillStyle = 'rgb(128, 128, 255)';
-  ctx.fillRect(0, 0, TEXTURE_SIZE, TEXTURE_SIZE);
+  ctx.fillRect(0, 0, ART_SIZE, ART_SIZE);
   return canvas;
 }
 
@@ -64,7 +73,36 @@ export function overlayFacadeWindow(canvas: HTMLCanvasElement, layer: TextureLay
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('2D canvas context unavailable — cannot overlay windows');
 
+  // Loaded canvases carry no transform, so map art units onto them here.
+  ctx.save();
+  ctx.scale(canvas.width / ART_SIZE, canvas.height / ART_SIZE);
   drawWindow(ctx, createRng(layer + 1), trim.frame, trim.sill);
+  ctx.restore();
+}
+
+/**
+ * Repeats a one-bay facade tile across a `bays` x `storeys` grid.
+ *
+ * A custom facade's layer is mapped as a whole multi-bay wall, so when its
+ * image fails to load, the stand-in has to be laid out the same way or one
+ * window would be stretched across several bays.
+ */
+export function repeatFacadeTile(
+  tile: HTMLCanvasElement,
+  bays: number,
+  storeys: number,
+): HTMLCanvasElement {
+  const { canvas, ctx } = createCanvas();
+  const w = ART_SIZE / bays;
+  const h = ART_SIZE / storeys;
+
+  for (let row = 0; row < storeys; row++) {
+    for (let col = 0; col < bays; col++) {
+      ctx.drawImage(tile, col * w, row * h, w, h);
+    }
+  }
+
+  return canvas;
 }
 
 function createCanvas(): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } {
@@ -75,19 +113,36 @@ function createCanvas(): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContex
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('2D canvas context unavailable — cannot build textures');
 
+  ctx.scale(TEXTURE_SIZE / ART_SIZE, TEXTURE_SIZE / ART_SIZE);
   return { canvas, ctx };
 }
 
-/** Per-pixel monochrome grain. Cheap way to stop flat fills looking plastic. */
+/**
+ * Monochrome grain, one speck per art unit. Cheap way to stop flat fills
+ * looking plastic.
+ *
+ * Pixel access ignores the canvas transform, so the grain is laid out in art
+ * units by hand. That keeps the speck size, and the RNG sequence that drives
+ * it, independent of TEXTURE_SIZE.
+ */
 function addGrain(ctx: CanvasRenderingContext2D, rng: Rng, amount: number): void {
-  const image = ctx.getImageData(0, 0, TEXTURE_SIZE, TEXTURE_SIZE);
+  const { width, height } = ctx.canvas;
+  const image = ctx.getImageData(0, 0, width, height);
   const { data } = image;
 
-  for (let i = 0; i < data.length; i += 4) {
-    const delta = (rng.next() - 0.5) * amount;
-    data[i] = clampByte((data[i] ?? 0) + delta);
-    data[i + 1] = clampByte((data[i + 1] ?? 0) + delta);
-    data[i + 2] = clampByte((data[i + 2] ?? 0) + delta);
+  const grain = new Float32Array(ART_SIZE * ART_SIZE);
+  for (let i = 0; i < grain.length; i++) grain[i] = (rng.next() - 0.5) * amount;
+
+  for (let y = 0; y < height; y++) {
+    const row = Math.floor((y * ART_SIZE) / height) * ART_SIZE;
+
+    for (let x = 0; x < width; x++) {
+      const delta = grain[row + Math.floor((x * ART_SIZE) / width)] ?? 0;
+      const i = (y * width + x) * 4;
+      data[i] = clampByte((data[i] ?? 0) + delta);
+      data[i + 1] = clampByte((data[i + 1] ?? 0) + delta);
+      data[i + 2] = clampByte((data[i + 2] ?? 0) + delta);
+    }
   }
 
   ctx.putImageData(image, 0, 0);
@@ -103,10 +158,10 @@ function fillWrapped(
   w: number,
   h: number,
 ): void {
-  for (const dx of [0, -TEXTURE_SIZE, TEXTURE_SIZE]) {
-    for (const dy of [0, -TEXTURE_SIZE, TEXTURE_SIZE]) {
-      if (x + dx > TEXTURE_SIZE || x + dx + w < 0) continue;
-      if (y + dy > TEXTURE_SIZE || y + dy + h < 0) continue;
+  for (const dx of [0, -ART_SIZE, ART_SIZE]) {
+    for (const dy of [0, -ART_SIZE, ART_SIZE]) {
+      if (x + dx > ART_SIZE || x + dx + w < 0) continue;
+      if (y + dy > ART_SIZE || y + dy + h < 0) continue;
       ctx.fillRect(x + dx, y + dy, w, h);
     }
   }
@@ -117,7 +172,7 @@ function drawAsphalt(): HTMLCanvasElement {
   const rng = createRng(11);
 
   ctx.fillStyle = '#3b3b40';
-  ctx.fillRect(0, 0, TEXTURE_SIZE, TEXTURE_SIZE);
+  ctx.fillRect(0, 0, ART_SIZE, ART_SIZE);
 
   // Worn patches where the surface has been resealed.
   for (let i = 0; i < 26; i++) {
@@ -125,8 +180,8 @@ function drawAsphalt(): HTMLCanvasElement {
     ctx.fillStyle = `rgba(${shade},${shade},${shade + 4},0.5)`;
     ctx.beginPath();
     ctx.ellipse(
-      rng.range(0, TEXTURE_SIZE),
-      rng.range(0, TEXTURE_SIZE),
+      rng.range(0, ART_SIZE),
+      rng.range(0, ART_SIZE),
       rng.range(8, 34),
       rng.range(6, 22),
       rng.range(0, Math.PI),
@@ -139,8 +194,8 @@ function drawAsphalt(): HTMLCanvasElement {
   ctx.strokeStyle = 'rgba(24,24,28,0.6)';
   ctx.lineWidth = 1.2;
   for (let i = 0; i < 10; i++) {
-    let x = rng.range(0, TEXTURE_SIZE);
-    let y = rng.range(0, TEXTURE_SIZE);
+    let x = rng.range(0, ART_SIZE);
+    let y = rng.range(0, ART_SIZE);
     ctx.beginPath();
     ctx.moveTo(x, y);
     for (let segment = 0; segment < 5; segment++) {
@@ -171,7 +226,7 @@ function drawRoadway(): HTMLCanvasElement {
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('2D canvas context unavailable — cannot paint road markings');
 
-  const s = TEXTURE_SIZE;
+  const s = ART_SIZE;
   const line = s * 0.016;
   ctx.fillStyle = '#c4a02a';
 
@@ -190,10 +245,10 @@ function drawRoadway(): HTMLCanvasElement {
 function drawSidewalk(): HTMLCanvasElement {
   const { canvas, ctx } = createCanvas();
   const rng = createRng(22);
-  const slab = TEXTURE_SIZE / 4;
+  const slab = ART_SIZE / 4;
 
   ctx.fillStyle = '#8d8a81';
-  ctx.fillRect(0, 0, TEXTURE_SIZE, TEXTURE_SIZE);
+  ctx.fillRect(0, 0, ART_SIZE, ART_SIZE);
 
   for (let j = 0; j < 4; j++) {
     for (let i = 0; i < 4; i++) {
@@ -206,8 +261,8 @@ function drawSidewalk(): HTMLCanvasElement {
   // Joints, drawn as dark inset lines rather than strokes so they stay crisp.
   ctx.fillStyle = 'rgba(60,58,52,0.75)';
   for (let i = 0; i < 4; i++) {
-    fillWrapped(ctx, i * slab - 1.5, 0, 3, TEXTURE_SIZE);
-    fillWrapped(ctx, 0, i * slab - 1.5, TEXTURE_SIZE, 3);
+    fillWrapped(ctx, i * slab - 1.5, 0, 3, ART_SIZE);
+    fillWrapped(ctx, 0, i * slab - 1.5, ART_SIZE, 3);
   }
 
   addGrain(ctx, rng, 20);
@@ -217,10 +272,10 @@ function drawSidewalk(): HTMLCanvasElement {
 function drawCobble(): HTMLCanvasElement {
   const { canvas, ctx } = createCanvas();
   const rng = createRng(33);
-  const stone = TEXTURE_SIZE / 8;
+  const stone = ART_SIZE / 8;
 
   ctx.fillStyle = '#4a453e';
-  ctx.fillRect(0, 0, TEXTURE_SIZE, TEXTURE_SIZE);
+  ctx.fillRect(0, 0, ART_SIZE, ART_SIZE);
 
   for (let j = 0; j < 8; j++) {
     // Alternate rows are offset half a stone, as real setts are laid.
@@ -247,7 +302,7 @@ function drawCobble(): HTMLCanvasElement {
  * across a wall produces an aligned grid of windows.
  */
 function drawWindow(ctx: CanvasRenderingContext2D, rng: Rng, frame: string, sill: string): void {
-  const s = ctx.canvas.width;
+  const s = ART_SIZE;
   const x = s * 0.29;
   const y = s * 0.2;
   const w = s * 0.42;
@@ -283,11 +338,11 @@ function drawWindow(ctx: CanvasRenderingContext2D, rng: Rng, frame: string, sill
 function drawBrickFacade(): HTMLCanvasElement {
   const { canvas, ctx } = createCanvas();
   const rng = createRng(44);
-  const brickH = TEXTURE_SIZE / 8;
-  const brickW = TEXTURE_SIZE / 4;
+  const brickH = ART_SIZE / 8;
+  const brickW = ART_SIZE / 4;
 
   ctx.fillStyle = '#4b3229';
-  ctx.fillRect(0, 0, TEXTURE_SIZE, TEXTURE_SIZE);
+  ctx.fillRect(0, 0, ART_SIZE, ART_SIZE);
 
   for (let row = 0; row < 8; row++) {
     const offset = row % 2 === 0 ? 0 : brickW / 2;
@@ -309,7 +364,7 @@ function drawPlasterFacade(): HTMLCanvasElement {
   const rng = createRng(55);
 
   ctx.fillStyle = '#b9b4a6';
-  ctx.fillRect(0, 0, TEXTURE_SIZE, TEXTURE_SIZE);
+  ctx.fillRect(0, 0, ART_SIZE, ART_SIZE);
 
   // Blotchy weathering across the stucco.
   for (let i = 0; i < 60; i++) {
@@ -317,8 +372,8 @@ function drawPlasterFacade(): HTMLCanvasElement {
     ctx.fillStyle = `rgba(${shade},${shade - 5},${shade - 18},0.25)`;
     ctx.beginPath();
     ctx.ellipse(
-      rng.range(0, TEXTURE_SIZE),
-      rng.range(0, TEXTURE_SIZE),
+      rng.range(0, ART_SIZE),
+      rng.range(0, ART_SIZE),
       rng.range(10, 40),
       rng.range(10, 40),
       0,
@@ -330,7 +385,7 @@ function drawPlasterFacade(): HTMLCanvasElement {
 
   // Storey band at the tile edge, so stacked tiles read as floor divisions.
   ctx.fillStyle = 'rgba(120,114,100,0.55)';
-  fillWrapped(ctx, 0, -3, TEXTURE_SIZE, 6);
+  fillWrapped(ctx, 0, -3, ART_SIZE, 6);
 
   drawWindow(ctx, rng, '#494036', '#8e887a');
   addGrain(ctx, rng, 14);
@@ -342,17 +397,12 @@ function drawRoof(): HTMLCanvasElement {
   const rng = createRng(66);
 
   ctx.fillStyle = '#34323a';
-  ctx.fillRect(0, 0, TEXTURE_SIZE, TEXTURE_SIZE);
+  ctx.fillRect(0, 0, ART_SIZE, ART_SIZE);
 
   for (let i = 0; i < 300; i++) {
     const shade = Math.floor(rng.range(44, 86));
     ctx.fillStyle = `rgb(${shade},${shade},${shade + 5})`;
-    ctx.fillRect(
-      rng.range(0, TEXTURE_SIZE),
-      rng.range(0, TEXTURE_SIZE),
-      rng.range(2, 7),
-      rng.range(2, 7),
-    );
+    ctx.fillRect(rng.range(0, ART_SIZE), rng.range(0, ART_SIZE), rng.range(2, 7), rng.range(2, 7));
   }
 
   addGrain(ctx, rng, 30);

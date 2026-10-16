@@ -1,8 +1,10 @@
 import { TextureLayer } from './layout';
+import { customFacadeLayer, type CustomFacade } from './facades';
 import {
   createFlatNormalMap,
   createSurfaceTextures,
   overlayFacadeWindow,
+  repeatFacadeTile,
   TEXTURE_SIZE,
 } from './textures';
 import {
@@ -13,6 +15,8 @@ import {
   SUN_DIRECTION,
 } from './sky';
 import { loadImageBitmap, rasterise, readPixels } from '@/gfx/image';
+import { loadModel, type LoadedModel } from '@/gfx/gltf';
+import type { VehicleModelConfig } from '@/vehicle/model';
 import { normalize, type Vec3 } from '@/math/vec3';
 
 /**
@@ -72,6 +76,67 @@ export const NORMAL_STRENGTH = 0.6;
  */
 export const OVERLAY_WINDOWS_ON_FACADES = true;
 
+/**
+ * Facades of your own, for individual buildings or groups of them.
+ *
+ * Each entry gets its own texture layer and goes on the buildings its targets
+ * pick; everything else keeps the built-in brick and stucco. Add entries to
+ * add facades — nothing else needs touching. See `CustomFacade` in
+ * `city/facades.ts` for the fields, and the README for how to prepare images.
+ */
+export const CUSTOM_FACADES: readonly CustomFacade[] = [
+  {
+    // Granite-clad block, cropped to exactly 9 x 7 window bays so it tiles.
+    // Source photo in assets-src/textures/facades/.
+    name: 'granite-grid',
+    url: '/textures/facades/granite-grid.jpg',
+    span: { bays: 9, storeys: 7 },
+    targets: [
+      // The corner block ahead and to the right of the spawn point.
+      { at: { x: 328, z: 327 } },
+    ],
+  },
+  {
+    // Granite-clad block, cropped to exactly 9 x 7 window bays so it tiles.
+    // Source photo in assets-src/textures/facades/.
+    name: 'granite-grid',
+    url: '/textures/facades/granite-grid.jpg',
+    span: { bays: 9, storeys: 7 },
+    targets: [
+      // The corner block ahead and to the right of the spawn point.
+      { at: { x: 248, z: 325 } },
+    ],
+  },
+];
+
+/**
+ * The drivable car.
+ *
+ * A binary glTF (.glb) facing +Z, with Y up. Textures it references by
+ * relative path are resolved against the model file, so keep the folder
+ * layout the model shipped with: Kenney's kit expects `Textures/colormap.png`
+ * next to the .glb. Size, wheelbase and wheel radius are measured off the
+ * model; `scale` converts its units to metres. See `VehicleModelConfig` for
+ * how wheels are found.
+ */
+export const VEHICLE: VehicleModelConfig = {
+  // Kenney "Car Kit" (CC0). Licence and preview in assets-src/models/.
+  url: '/models/ambulance.glb',
+  scale: 1.4,
+  spinPrefix: 'wheel-',
+  steerPrefix: 'wheel-front',
+};
+
+/** The car model, or null if it fails to load: the city still works on foot. */
+export async function loadVehicleModel(): Promise<LoadedModel | null> {
+  try {
+    return await loadModel(VEHICLE.url);
+  } catch (error) {
+    console.warn('No car this session, the model failed to load:', error);
+    return null;
+  }
+}
+
 export type SkySource =
   | { kind: 'procedural' }
   /** Six cube faces in GL order: +X, -X, +Y, -Y, +Z, -Z. */
@@ -108,7 +173,7 @@ export interface ResolvedSky {
 }
 
 export interface CityAssets {
-  /** One canvas per TextureLayer, all TEXTURE_SIZE square. */
+  /** One canvas per TextureLayer, then one per custom facade, all TEXTURE_SIZE square. */
   surfaces: HTMLCanvasElement[];
   /** Matching normal maps, flat where a layer has none. */
   normals: HTMLCanvasElement[];
@@ -149,9 +214,12 @@ function layerEntries(
 
 async function loadSurfaceTextures(): Promise<HTMLCanvasElement[]> {
   const surfaces = createSurfaceTextures();
+  // Taken before any override lands, as the stand-in for custom facades.
+  const plaster = surfaces[TextureLayer.Plaster];
+  if (!plaster) throw new Error('Procedural plaster texture missing');
 
-  await Promise.all(
-    layerEntries(SURFACE_TEXTURES).map(async ([layer, url]) => {
+  await Promise.all([
+    ...layerEntries(SURFACE_TEXTURES).map(async ([layer, url]) => {
       try {
         const canvas = rasterise(await loadImageBitmap(url), TEXTURE_SIZE);
         if (OVERLAY_WINDOWS_ON_FACADES) overlayFacadeWindow(canvas, layer);
@@ -160,7 +228,16 @@ async function loadSurfaceTextures(): Promise<HTMLCanvasElement[]> {
         console.warn(`Keeping the procedural texture for layer ${layer}:`, error);
       }
     }),
-  );
+    ...CUSTOM_FACADES.map(async (facade, index) => {
+      const layer = customFacadeLayer(index);
+      try {
+        surfaces[layer] = rasterise(await loadImageBitmap(facade.url), TEXTURE_SIZE);
+      } catch (error) {
+        console.warn(`Custom facade "${facade.name}" falls back to plaster:`, error);
+        surfaces[layer] = repeatFacadeTile(plaster, facade.span.bays, facade.span.storeys);
+      }
+    }),
+  ]);
 
   return surfaces;
 }
@@ -169,17 +246,29 @@ async function loadNormalMaps(): Promise<HTMLCanvasElement[]> {
   // One flat canvas, shared by every layer without a map of its own: the
   // upload reads it per layer, so there is no need for six copies.
   const flat = createFlatNormalMap();
-  const normals = Object.values(TextureLayer).map(() => flat);
+  // Custom facades included, so both arrays have the same depth.
+  const normals = [...Object.values(TextureLayer), ...CUSTOM_FACADES].map(() => flat);
 
-  await Promise.all(
-    layerEntries(SURFACE_NORMAL_MAPS).map(async ([layer, url]) => {
+  await Promise.all([
+    ...layerEntries(SURFACE_NORMAL_MAPS).map(async ([layer, url]) => {
       try {
         normals[layer] = rasterise(await loadImageBitmap(url), TEXTURE_SIZE);
       } catch (error) {
         console.warn(`No normal map for layer ${layer}, shading it flat:`, error);
       }
     }),
-  );
+    ...CUSTOM_FACADES.map(async ({ name, normalUrl }, index) => {
+      if (!normalUrl) return;
+      try {
+        normals[customFacadeLayer(index)] = rasterise(
+          await loadImageBitmap(normalUrl),
+          TEXTURE_SIZE,
+        );
+      } catch (error) {
+        console.warn(`No normal map for custom facade "${name}", shading it flat:`, error);
+      }
+    }),
+  ]);
 
   return normals;
 }

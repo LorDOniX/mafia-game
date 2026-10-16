@@ -24,6 +24,10 @@ const mipLevels = (size: number): number => Math.floor(Math.log2(size)) + 1;
  *
  * An array beats a classic atlas here: every layer keeps its own REPEAT wrap
  * and its own mip chain, so tiled facades cannot bleed into their neighbours.
+ *
+ * Canvases are uploaded flipped, so the bottom row of an image sits at v = 0
+ * as GL expects. Walls run v upward from the ground, so facades stand the right
+ * way up, and OpenGL-convention normal maps get green pointing toward +v.
  */
 export function createTextureArray(
   gl: WebGL2RenderingContext,
@@ -35,6 +39,7 @@ export function createTextureArray(
 
   gl.bindTexture(gl.TEXTURE_2D_ARRAY, texture);
   gl.texStorage3D(gl.TEXTURE_2D_ARRAY, mipLevels(size), gl.RGBA8, size, size, sources.length);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
 
   sources.forEach((source, layer) => {
     gl.texSubImage3D(
@@ -52,6 +57,8 @@ export function createTextureArray(
     );
   });
 
+  // Unpack state is global; the sky cube map must not inherit the flip.
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
   gl.generateMipmap(gl.TEXTURE_2D_ARRAY);
   gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
   gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
@@ -89,5 +96,40 @@ export function createCubeMap(
   gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_R, gl.CLAMP_TO_EDGE);
 
   gl.bindTexture(gl.TEXTURE_CUBE_MAP, null);
+  return texture;
+}
+
+/**
+ * A plain mipmapped 2D texture, for models.
+ *
+ * Uploaded unflipped on purpose: glTF puts UV (0, 0) at the top-left of the
+ * image, which is exactly where an unflipped upload leaves the first row.
+ * `null` gives a 1x1 white texture, so untextured models still draw.
+ */
+export function createTexture2D(
+  gl: WebGL2RenderingContext,
+  source: TexImageSource | null,
+): WebGLTexture {
+  const texture = gl.createTexture();
+  if (!texture) throw new Error('Failed to create texture');
+
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+
+  if (source) {
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, source);
+    gl.generateMipmap(gl.TEXTURE_2D);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+    applyMaxAnisotropy(gl, gl.TEXTURE_2D);
+  } else {
+    const white = new Uint8Array([255, 255, 255, 255]);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, white);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  }
+
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+
+  gl.bindTexture(gl.TEXTURE_2D, null);
   return texture;
 }
