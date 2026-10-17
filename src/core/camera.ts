@@ -42,6 +42,11 @@ export class Camera {
     return { x: Math.cos(this.yaw), y: 0, z: Math.sin(this.yaw) };
   }
 
+  /** Field of view across the screen width; `fov` is the vertical one. */
+  horizontalFov(): number {
+    return 2 * Math.atan(Math.tan(this.fov / 2) * this.aspect);
+  }
+
   addLook(deltaYaw: number, deltaPitch: number): void {
     this.yaw = (this.yaw + deltaYaw) % (Math.PI * 2);
     this.pitch = Math.min(Math.max(this.pitch + deltaPitch, -MAX_PITCH), MAX_PITCH);

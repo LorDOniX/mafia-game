@@ -1,2 +1,4 @@
 nvidia nebo cpu, video x2
 fotko - stejná úprava jako chatgpt, lokální model
+popis pro lamu do md, grafika jak všechno funguje, hlavně grafika
+přepis do threejs

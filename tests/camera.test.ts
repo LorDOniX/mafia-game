@@ -3,6 +3,16 @@ import { Camera } from '@/core/camera';
 import { dot, length } from '@/math/vec3';
 
 describe('Camera basis', () => {
+  it('widens the horizontal field of view with the aspect ratio', () => {
+    const camera = new Camera();
+    camera.aspect = 1;
+    expect(camera.horizontalFov()).toBeCloseTo(camera.fov);
+
+    camera.fov = Math.PI / 2;
+    camera.aspect = 16 / 9;
+    expect(camera.horizontalFov()).toBeCloseTo(2 * Math.atan(16 / 9));
+  });
+
   it('looks down -Z at yaw 0', () => {
     const camera = new Camera();
     const forward = camera.forward();

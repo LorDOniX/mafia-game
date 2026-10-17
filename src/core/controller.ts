@@ -13,6 +13,9 @@ const FLY_SPRINT = 70;
 const MOUSE_SENSITIVITY = 0.0022;
 /** Higher settles the camera onto the target velocity faster. */
 const DAMPING = 14;
+/** Take-off speed, m/s, and gravity, m/s^2: about a 1 m jump. */
+const JUMP_SPEED = 6;
+const GRAVITY = 18;
 
 /**
  * WASD + mouse-look controller with two modes: `walk` keeps the camera at eye
@@ -23,6 +26,7 @@ export class FirstPersonController {
   mode: MoveMode = 'walk';
 
   private velocity = { x: 0, y: 0, z: 0 };
+  private airborne = false;
 
   constructor(
     private readonly camera: Camera,
@@ -37,6 +41,7 @@ export class FirstPersonController {
     this.camera.yaw = yaw;
     this.camera.pitch = 0;
     this.velocity = { x: 0, y: 0, z: 0 };
+    this.airborne = false;
   }
 
   update(dt: number): void {
@@ -44,6 +49,7 @@ export class FirstPersonController {
 
     if (input.wasPressed('KeyF')) {
       this.mode = this.mode === 'walk' ? 'fly' : 'walk';
+      this.airborne = false;
     }
 
     if (input.pointerLocked) {
@@ -86,7 +92,8 @@ export class FirstPersonController {
     // Frame-rate independent exponential smoothing toward the target velocity.
     const blend = 1 - Math.exp(-DAMPING * dt);
     this.velocity.x += (targetX - this.velocity.x) * blend;
-    this.velocity.y += (targetY - this.velocity.y) * blend;
+    // Walking leaves vertical speed to the jump and gravity.
+    if (this.mode === 'fly') this.velocity.y += (targetY - this.velocity.y) * blend;
     this.velocity.z += (targetZ - this.velocity.z) * blend;
 
     const nextX = camera.position.x + this.velocity.x * dt;
@@ -103,10 +110,25 @@ export class FirstPersonController {
       camera.position.x = resolved.x;
       camera.position.z = resolved.z;
 
-      // Kerbs are only 15cm, so snapping up onto them reads as smooth.
       const ground = this.collision.groundHeightAt(resolved.x, resolved.z) + EYE_HEIGHT;
-      camera.position.y += (ground - camera.position.y) * blend;
-      this.velocity.y = 0;
+      if (!this.airborne && input.wasPressed('Space')) {
+        this.airborne = true;
+        this.velocity.y = JUMP_SPEED;
+      }
+
+      if (this.airborne) {
+        this.velocity.y -= GRAVITY * dt;
+        camera.position.y += this.velocity.y * dt;
+        if (camera.position.y <= ground) {
+          camera.position.y = ground;
+          this.airborne = false;
+          this.velocity.y = 0;
+        }
+      } else {
+        // Kerbs are only 15cm, so snapping up onto them reads as smooth.
+        camera.position.y += (ground - camera.position.y) * blend;
+        this.velocity.y = 0;
+      }
     } else {
       camera.position.x = nextX;
       camera.position.z = nextZ;

@@ -20,9 +20,12 @@ import { createRng } from '@/core/rng';
 import { PARKED, Vehicle } from '@/vehicle/vehicle';
 import { fitVehicle, vehiclePose, vehicleTransform } from '@/vehicle/model';
 import { randomLoop, RouteDriver } from '@/vehicle/traffic';
+import { Minimap, type MapCar } from '@/ui/minimap';
 import type { ModelInstance } from '@/gfx/model';
 
 const HUD_INTERVAL = 0.25;
+const PLAYER_CAR_COLOR = '#e0b84a';
+const POLICE_COLOR = '#3f7bff';
 
 async function main(): Promise<void> {
   const canvas = document.querySelector<HTMLCanvasElement>('#gl');
@@ -30,8 +33,20 @@ async function main(): Promise<void> {
   const prompt = document.querySelector<HTMLElement>('#prompt');
   const crosshair = document.querySelector<HTMLElement>('#crosshair');
   const hud = document.querySelector<HTMLElement>('#hud');
+  const minimapCanvas = document.querySelector<HTMLCanvasElement>('#minimap');
+  const speedo = document.querySelector<HTMLElement>('#speedo');
+  const speedoValue = speedo?.querySelector<HTMLElement>('.value');
 
-  if (!canvas || !overlay || !prompt || !crosshair || !hud) {
+  if (
+    !canvas ||
+    !overlay ||
+    !prompt ||
+    !crosshair ||
+    !hud ||
+    !minimapCanvas ||
+    !speedo ||
+    !speedoValue
+  ) {
     throw new Error('Missing required DOM nodes');
   }
 
@@ -86,6 +101,15 @@ async function main(): Promise<void> {
     : [];
   const drive = new DriveController(camera, input, collision);
   let driving = false;
+  const minimap = new Minimap(minimapCanvas, layout);
+  const mapCar = (v: Vehicle, color: string): MapCar => ({
+    x: v.x,
+    z: v.z,
+    heading: v.heading,
+    length: v.body.length,
+    width: v.body.width,
+    color,
+  });
 
   // A denied lock request (no user gesture, or the cooldown right after Esc)
   // would otherwise read as a dead click.
@@ -145,6 +169,22 @@ async function main(): Promise<void> {
     }
     renderer.render(camera, instances);
     input.endFrame();
+
+    minimap.draw(
+      {
+        x: camera.position.x,
+        z: camera.position.z,
+        yaw: camera.yaw,
+        fov: camera.horizontalFov(),
+      },
+      [
+        ...patrols.map((p) => mapCar(p.vehicle, POLICE_COLOR)),
+        ...(vehicle ? [mapCar(vehicle, PLAYER_CAR_COLOR)] : []),
+      ],
+    );
+
+    speedo.hidden = !(driving && vehicle);
+    if (driving && vehicle) speedoValue.textContent = Math.abs(vehicle.speed * 3.6).toFixed(0);
 
     const locked = input.pointerLocked;
     overlay.hidden = locked;
