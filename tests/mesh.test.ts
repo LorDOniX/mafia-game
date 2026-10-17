@@ -194,9 +194,11 @@ describe('building walls', () => {
         sidewalk: { minX: 86, maxX: 134, minZ: 186, maxZ: 234 },
         buildings: [building],
         isPlaza: false,
+        isPark: false,
       },
     ],
     buildings: [building],
+    trees: [],
     bounds: { minX: 0, minZ: 0, maxX: 240, maxZ: 240 },
     pitch: DEFAULT_CITY_CONFIG.blockSize + DEFAULT_CITY_CONFIG.streetWidth,
   };

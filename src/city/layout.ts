@@ -18,6 +18,8 @@ export const TextureLayer = {
   Roof: 5,
   /** Unmarked asphalt, tiled freely. Used for the ground plane. */
   Asphalt: 6,
+  /** Park lawns. */
+  Grass: 7,
 } as const;
 
 export type TextureLayer = (typeof TextureLayer)[keyof typeof TextureLayer];
@@ -56,6 +58,20 @@ export interface Block {
   /** Open blocks (plazas/parks) carry no buildings. */
   buildings: Building[];
   isPlaza: boolean;
+  /** A plaza laid to grass rather than paved. */
+  isPark: boolean;
+}
+
+export interface TreeSpot {
+  x: number;
+  z: number;
+  /** Street trees line sidewalks and squares; park trees are mixed. */
+  kind: 'street' | 'park';
+  /** In [0, 1), for picking a species from whichever list `kind` uses. */
+  variant: number;
+  rotation: number;
+  /** Multiplier on the species' height. */
+  size: number;
 }
 
 export interface CityConfig {
@@ -72,6 +88,10 @@ export interface CityConfig {
   minBuildingWidth: number;
   maxBuildingWidth: number;
   plazaChance: number;
+  /** Chance of a built block becoming a park instead, at the edge of town; none downtown. */
+  parkChance: number;
+  /** Gap between street trees along a sidewalk, metres. */
+  streetTreeSpacing: number;
 }
 
 export const DEFAULT_CITY_CONFIG: CityConfig = {
@@ -86,12 +106,15 @@ export const DEFAULT_CITY_CONFIG: CityConfig = {
   minBuildingWidth: 9,
   maxBuildingWidth: 19,
   plazaChance: 0.09,
+  parkChance: 0.3,
+  streetTreeSpacing: 14 * 3,
 };
 
 export interface CityLayout {
   config: CityConfig;
   blocks: Block[];
   buildings: Building[];
+  trees: TreeSpot[];
   /** Full extent of the ground plane, streets included. */
   bounds: Rect;
   /** Centre-to-centre distance between adjacent blocks. */
@@ -118,6 +141,9 @@ const PLASTER_TINTS: Array<[number, number, number]> = [
 export function generateCity(overrides: Partial<CityConfig> = {}): CityLayout {
   const config: CityConfig = { ...DEFAULT_CITY_CONFIG, ...overrides };
   const rng = createRng(config.seed);
+  // Parks and trees draw from their own stream, so adding them leaves every
+  // building where it was.
+  const greenRng = createRng(config.seed ^ 0x5eed7ee5);
   const pitch = config.blockSize + config.streetWidth;
   const half = config.streetWidth / 2;
 
@@ -142,9 +168,14 @@ export function generateCity(overrides: Partial<CityConfig> = {}): CityLayout {
       // Downtown sits in the middle: 1 at the centre block, 0 at the corners.
       const density = 1 - Math.hypot(i - centre, j - centre) / maxDistance;
 
-      const block: Block = { plot, sidewalk, buildings: [], isPlaza };
+      const block: Block = { plot, sidewalk, buildings: [], isPlaza, isPark: false };
       if (!isPlaza) {
         fillPerimeter(block, config, rng, density);
+        if (greenRng.chance(config.parkChance * (1 - density))) {
+          block.buildings = [];
+          block.isPlaza = true;
+          block.isPark = true;
+        }
         buildings.push(...block.buildings);
       }
       blocks.push(block);
@@ -156,6 +187,7 @@ export function generateCity(overrides: Partial<CityConfig> = {}): CityLayout {
     config,
     blocks,
     buildings,
+    trees: plantTrees(blocks, config, greenRng),
     bounds: { minX: 0, minZ: 0, maxX: span, maxZ: span },
     pitch,
   };
@@ -232,6 +264,107 @@ function fillPerimeter(
       cursor += width;
     }
   }
+}
+
+/** Trunk distance from the kerb edge of a sidewalk. */
+const STREET_TREE_INSET = 1.2;
+/** Sidewalk left bare at each corner, for the crossing. */
+const CORNER_CLEARANCE = 7;
+/** Squares: a ring of trees this far inside the plot, this far apart. */
+const SQUARE_TREE_INSET = 4;
+const SQUARE_TREE_SPACING = 12;
+/** Parks: one tree per grid cell, maybe, with paths left clear through the middle. */
+const PARK_CELL = 9;
+const PARK_FILL = 0.75;
+const PARK_PATH_HALF_WIDTH = 4;
+
+/** Street trees along every sidewalk, a ring round each square, and parks planted. */
+function plantTrees(
+  blocks: readonly Block[],
+  config: CityConfig,
+  rng: ReturnType<typeof createRng>,
+): TreeSpot[] {
+  const trees: TreeSpot[] = [];
+  const spot = (x: number, z: number, kind: TreeSpot['kind'], variant: number): void => {
+    trees.push({
+      x,
+      z,
+      kind,
+      variant,
+      rotation: rng.range(0, Math.PI * 2),
+      size: rng.range(0.85, 1.15),
+    });
+  };
+
+  for (const block of blocks) {
+    const { sidewalk, plot } = block;
+    const s = STREET_TREE_INSET;
+    for (const side of rectSides(sidewalk, s)) {
+      // One species per side of the street, as an avenue would be planted.
+      const variant = rng.next();
+      for (const p of evenlyAlong(side, CORNER_CLEARANCE, config.streetTreeSpacing)) {
+        spot(p.x, p.z, 'street', variant);
+      }
+    }
+
+    if (block.isPark) {
+      const cx = (plot.minX + plot.maxX) / 2;
+      const cz = (plot.minZ + plot.maxZ) / 2;
+      const jitter = PARK_CELL * 0.3;
+      for (let x = plot.minX + PARK_CELL / 2; x < plot.maxX; x += PARK_CELL) {
+        for (let z = plot.minZ + PARK_CELL / 2; z < plot.maxZ; z += PARK_CELL) {
+          if (Math.abs(x - cx) < PARK_PATH_HALF_WIDTH || Math.abs(z - cz) < PARK_PATH_HALF_WIDTH) {
+            continue;
+          }
+          if (!rng.chance(PARK_FILL)) continue;
+          spot(x + rng.range(-jitter, jitter), z + rng.range(-jitter, jitter), 'park', rng.next());
+        }
+      }
+    } else if (block.isPlaza) {
+      const variant = rng.next();
+      for (const side of rectSides(plot, SQUARE_TREE_INSET)) {
+        for (const p of evenlyAlong(side, SQUARE_TREE_INSET * 2, SQUARE_TREE_SPACING)) {
+          spot(p.x, p.z, 'street', variant);
+        }
+      }
+    }
+  }
+
+  return trees;
+}
+
+interface Segment {
+  from: { x: number; z: number };
+  to: { x: number; z: number };
+}
+
+/** The four sides of a rect, each pulled `inset` in from its edge, running full length. */
+function rectSides(rect: Rect, inset: number): Segment[] {
+  const { minX, maxX, minZ, maxZ } = rect;
+  return [
+    { from: { x: minX, z: minZ + inset }, to: { x: maxX, z: minZ + inset } },
+    { from: { x: minX, z: maxZ - inset }, to: { x: maxX, z: maxZ - inset } },
+    { from: { x: minX + inset, z: minZ }, to: { x: minX + inset, z: maxZ } },
+    { from: { x: maxX - inset, z: minZ }, to: { x: maxX - inset, z: maxZ } },
+  ];
+}
+
+/** Points spaced evenly along a segment, centred, keeping `margin` clear at both ends. */
+function evenlyAlong(
+  { from, to }: Segment,
+  margin: number,
+  spacing: number,
+): Array<{ x: number; z: number }> {
+  const length = Math.hypot(to.x - from.x, to.z - from.z);
+  const usable = length - 2 * margin;
+  if (usable < 0) return [];
+
+  const count = Math.floor(usable / spacing) + 1;
+  const start = margin + (usable - (count - 1) * spacing) / 2;
+  return Array.from({ length: count }, (_, i) => {
+    const t = (start + i * spacing) / length;
+    return { x: from.x + (to.x - from.x) * t, z: from.z + (to.z - from.z) * t };
+  });
 }
 
 export const rectContains = (rect: Rect, x: number, z: number): boolean =>

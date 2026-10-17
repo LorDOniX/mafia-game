@@ -45,6 +45,8 @@ export const SURFACE_TEXTURES: Partial<Record<TextureLayer, string>> = {
   // [TextureLayer.Brick]: '/textures/brick.png',
   // [TextureLayer.Plaster]: '/textures/plaster.png',
   // [TextureLayer.Roof]: '/textures/roof.png',
+  // Park lawns, tiled freely; e.g. an ambientCG "Grass" swatch.
+  // [TextureLayer.Grass]: '/textures/park/grass.jpg',
 };
 
 /**
@@ -137,14 +139,32 @@ export const POLICE: VehicleModelConfig = {
 
 export const POLICE_COUNT = 5;
 
-/** A car model, or null if it fails to load: the city still works without it. */
-export async function loadVehicleModel(
-  config: VehicleModelConfig = VEHICLE,
-): Promise<LoadedModel | null> {
+/**
+ * Tree species: a model and the height it should stand, in metres. Width
+ * follows from the model's proportions.
+ *
+ * Kenney "Nature Kit" (CC0). Each tree is two coloured materials, crown and
+ * trunk, with no texture.
+ */
+export const TREE_MODELS = {
+  oak: { url: '/models/tree_oak.glb', height: 8 },
+  pine: { url: '/models/tree_pineDefaultA.glb', height: 10 },
+  smallPine: { url: '/models/tree_pineSmallA.glb', height: 5 },
+} satisfies Record<string, { url: string; height: number }>;
+
+export type TreeSpecies = keyof typeof TREE_MODELS;
+
+/** Sidewalks and squares. One species per side of a street, picked from here. */
+export const STREET_TREES: readonly TreeSpecies[] = ['oak'];
+/** Parks, mixed tree by tree; repeat an entry to make it more common. */
+export const PARK_TREES: readonly TreeSpecies[] = ['oak', 'oak', 'pine', 'smallPine'];
+
+/** A model, or null if it fails to load: the city still works without it. */
+export async function loadOptionalModel(url: string): Promise<LoadedModel | null> {
   try {
-    return await loadModel(config.url);
+    return await loadModel(url);
   } catch (error) {
-    console.warn(`No ${config.url} this session, the model failed to load:`, error);
+    console.warn(`No ${url} this session, the model failed to load:`, error);
     return null;
   }
 }

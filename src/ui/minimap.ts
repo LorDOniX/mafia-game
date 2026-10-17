@@ -9,8 +9,12 @@ const CONE_LENGTH = 70;
 
 const ROAD = '#2b2a28';
 const SIDEWALK = '#55524b';
-const PLAZA = '#4b5a3c';
+const SQUARE = '#625d53';
+const PARK = '#4b5a3c';
 const BUILDING = '#a99d84';
+const TREE = '#2f4a26';
+/** Crown radius drawn on the map, metres. */
+const TREE_RADIUS = 2;
 
 export interface MapView {
   x: number;
@@ -99,7 +103,7 @@ export class Minimap {
   }
 }
 
-/** The static city, drawn once: streets, sidewalks, plazas and buildings. */
+/** The static city, drawn once: streets, sidewalks, open blocks, buildings and trees. */
 function bakeCity(layout: CityLayout): HTMLCanvasElement {
   const { bounds } = layout;
   const canvas = document.createElement('canvas');
@@ -117,13 +121,20 @@ function bakeCity(layout: CityLayout): HTMLCanvasElement {
     ctx.fillStyle = SIDEWALK;
     fillRect(ctx, block.sidewalk);
     if (block.isPlaza) {
-      ctx.fillStyle = PLAZA;
+      ctx.fillStyle = block.isPark ? PARK : SQUARE;
       fillRect(ctx, block.plot);
     }
   }
 
   ctx.fillStyle = BUILDING;
   for (const building of layout.buildings) fillRect(ctx, building.footprint);
+
+  ctx.fillStyle = TREE;
+  for (const tree of layout.trees) {
+    ctx.beginPath();
+    ctx.arc(tree.x, tree.z, TREE_RADIUS, 0, Math.PI * 2);
+    ctx.fill();
+  }
   return canvas;
 }
 

@@ -1,9 +1,11 @@
 import { rectContains, type CityLayout, type Rect } from './layout';
 
 const CELL_SIZE = 20;
+/** Half the side of the square that stands in for a tree trunk. */
+export const TRUNK_RADIUS = 0.3;
 
 /**
- * Uniform grid over building footprints.
+ * Uniform grid over building footprints and tree trunks.
  *
  * The city is a few hundred metres across with ~700 buildings, so testing every
  * footprint per frame would be wasteful; bucketing by cell keeps each query to a
@@ -18,8 +20,14 @@ export class CityCollision {
     this.bounds = layout.bounds;
     this.columns = Math.ceil((this.bounds.maxX - this.bounds.minX) / CELL_SIZE) + 1;
 
-    for (const building of layout.buildings) {
-      const rect = building.footprint;
+    const trunks = layout.trees.map(({ x, z }) => ({
+      minX: x - TRUNK_RADIUS,
+      maxX: x + TRUNK_RADIUS,
+      minZ: z - TRUNK_RADIUS,
+      maxZ: z + TRUNK_RADIUS,
+    }));
+
+    for (const rect of [...layout.buildings.map((b) => b.footprint), ...trunks]) {
       const minI = this.cellIndex(rect.minX);
       const maxI = this.cellIndex(rect.maxX);
       const minJ = this.cellIndex(rect.minZ);

@@ -5,13 +5,15 @@ import { loadImageBitmap } from './image';
 /**
  * A minimal glTF 2.0 loader, binary (.glb) only.
  *
- * It reads what a vehicle prop needs and nothing more: triangle meshes with
- * positions, normals and one UV set, the node hierarchy, and a single
- * base-colour texture. No animation, skinning, morph targets or PBR. Anything
- * it cannot honour throws with a reason, rather than drawing something wrong.
+ * It reads what a prop needs and nothing more: triangle meshes with
+ * positions, normals and one UV set, the node hierarchy, a base colour per
+ * material and a single base-colour texture. No animation, skinning, morph
+ * targets or PBR. Anything it cannot honour throws with a reason, rather than
+ * drawing something wrong.
  *
  * Mesh nodes come out as separate parts, keyed by node name, so a caller can
- * move pieces independently — spin wheels, open doors.
+ * move pieces independently — spin wheels, open doors. A node whose mesh uses
+ * several materials becomes several parts under the same name.
  */
 
 /** position(3) + normal(3) + uv(2) */
@@ -26,7 +28,11 @@ export interface ModelPart {
   /** Bounds of the part's own geometry, before `matrix`. */
   min: Vec3;
   max: Vec3;
+  /** The material's colour, multiplied over the texture. */
+  baseColor: RGBA;
 }
+
+export type RGBA = [number, number, number, number];
 
 /** A `uri` image is relative to the model file, as glTF specifies. */
 export type ModelImage =
@@ -37,8 +43,6 @@ export interface ModelData {
   parts: ModelPart[];
   /** The first base-colour texture any material uses. */
   image: ModelImage | null;
-  /** Multiplied over the texture. */
-  baseColor: [number, number, number, number];
   doubleSided: boolean;
 }
 
@@ -181,7 +185,7 @@ function readModel(gltf: GltfJson, bin: DataView | null): ModelData {
   const scene = gltf.scenes?.[gltf.scene ?? 0];
   if (!scene) throw new Error('glTF has no scene');
 
-  const model: ModelData = { parts: [], image: null, baseColor: [1, 1, 1, 1], doubleSided: false };
+  const model: ModelData = { parts: [], image: null, doubleSided: false };
   let materialSeen = false;
 
   const visit = (index: number, parent: Mat4): void => {
@@ -202,13 +206,23 @@ function readModel(gltf: GltfJson, bin: DataView | null): ModelData {
       if (!mesh) throw new Error(`Missing mesh ${node.mesh}`);
 
       const name = node.name ?? mesh.name ?? `node-${index}`;
-      model.parts.push(readMesh(gltf, bin, mesh.primitives, name, matrix));
-
-      // One texture per model: the first material that names one wins.
+      const byMaterial = new Map<number | undefined, GltfPrimitive[]>();
       for (const primitive of mesh.primitives) {
-        if (materialSeen || primitive.material === undefined) continue;
-        materialSeen = true;
-        readMaterial(gltf, bin, primitive.material, model);
+        const group = byMaterial.get(primitive.material);
+        if (group) group.push(primitive);
+        else byMaterial.set(primitive.material, [primitive]);
+      }
+
+      for (const [material, primitives] of byMaterial) {
+        model.parts.push(
+          readMesh(gltf, bin, primitives, name, matrix, materialColor(gltf, material)),
+        );
+
+        // One texture per model: the first material that names one wins.
+        if (!materialSeen && material !== undefined) {
+          materialSeen = true;
+          readMaterial(gltf, bin, material, model);
+        }
       }
     }
 
@@ -225,6 +239,7 @@ function readMesh(
   primitives: GltfPrimitive[],
   name: string,
   matrix: Mat4,
+  baseColor: RGBA,
 ): ModelPart {
   const vertices: number[] = [];
   const indices: number[] = [];
@@ -244,35 +259,41 @@ function readMesh(
     const normals = readFloats(gltf, bin, NORMAL, 'VEC3');
     const uvs = TEXCOORD_0 !== undefined ? readFloats(gltf, bin, TEXCOORD_0, 'VEC2') : null;
     const count = positions.length / 3;
-    const base = vertices.length / FLOATS_PER_MODEL_VERTEX;
+    const source =
+      primitive.indices !== undefined
+        ? readIndices(gltf, bin, primitive.indices)
+        : Uint32Array.from({ length: count }, (_, i) => i);
 
-    for (let i = 0; i < count; i++) {
-      const x = positions[i * 3] ?? 0;
-      const y = positions[i * 3 + 1] ?? 0;
-      const z = positions[i * 3 + 2] ?? 0;
-      vertices.push(
-        x,
-        y,
-        z,
-        normals[i * 3] ?? 0,
-        normals[i * 3 + 1] ?? 0,
-        normals[i * 3 + 2] ?? 0,
-        uvs?.[i * 2] ?? 0,
-        uvs?.[i * 2 + 1] ?? 0,
-      );
+    // Primitives often share one vertex buffer; keep only the vertices this one uses.
+    const remap = new Map<number, number>();
+    for (const i of source) {
+      let mapped = remap.get(i);
+      if (mapped === undefined) {
+        mapped = vertices.length / FLOATS_PER_MODEL_VERTEX;
+        remap.set(i, mapped);
 
-      min.x = Math.min(min.x, x);
-      min.y = Math.min(min.y, y);
-      min.z = Math.min(min.z, z);
-      max.x = Math.max(max.x, x);
-      max.y = Math.max(max.y, y);
-      max.z = Math.max(max.z, z);
-    }
+        const x = positions[i * 3] ?? 0;
+        const y = positions[i * 3 + 1] ?? 0;
+        const z = positions[i * 3 + 2] ?? 0;
+        vertices.push(
+          x,
+          y,
+          z,
+          normals[i * 3] ?? 0,
+          normals[i * 3 + 1] ?? 0,
+          normals[i * 3 + 2] ?? 0,
+          uvs?.[i * 2] ?? 0,
+          uvs?.[i * 2 + 1] ?? 0,
+        );
 
-    if (primitive.indices !== undefined) {
-      for (const index of readIndices(gltf, bin, primitive.indices)) indices.push(base + index);
-    } else {
-      for (let i = 0; i < count; i++) indices.push(base + i);
+        min.x = Math.min(min.x, x);
+        min.y = Math.min(min.y, y);
+        min.z = Math.min(min.z, z);
+        max.x = Math.max(max.x, x);
+        max.y = Math.max(max.y, y);
+        max.z = Math.max(max.z, z);
+      }
+      indices.push(mapped);
     }
   }
 
@@ -283,7 +304,14 @@ function readMesh(
     indices: new Uint32Array(indices),
     min,
     max,
+    baseColor,
   };
+}
+
+function materialColor(gltf: GltfJson, index: number | undefined): RGBA {
+  const material = index !== undefined ? gltf.materials?.[index] : undefined;
+  const [r = 1, g = 1, b = 1, a = 1] = material?.pbrMetallicRoughness?.baseColorFactor ?? [];
+  return [r, g, b, a];
 }
 
 function readMaterial(gltf: GltfJson, bin: DataView | null, index: number, model: ModelData): void {
@@ -291,9 +319,6 @@ function readMaterial(gltf: GltfJson, bin: DataView | null, index: number, model
   if (!material) return;
 
   model.doubleSided = material.doubleSided ?? false;
-
-  const [r = 1, g = 1, b = 1, a = 1] = material.pbrMetallicRoughness?.baseColorFactor ?? [];
-  model.baseColor = [r, g, b, a];
 
   const textureIndex = material.pbrMetallicRoughness?.baseColorTexture?.index;
   if (textureIndex === undefined) return;

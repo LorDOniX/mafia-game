@@ -2,3 +2,12 @@ nvidia nebo cpu, video x2
 fotko - stejná úprava jako chatgpt, lokální model
 popis pro lamu do md, grafika jak všechno funguje, hlavně grafika
 přepis do threejs
+--
+chodci - https://kenney.nl/assets/blocky-characters
+lampy - osvětlení
+skybox - hotogo
+smysl hry?
+pauznutí hry, kolize
+https://kenney.nl/assets/cube-pets - zvířata do parku
+
+vlaky - 2d izometrická https://kenney.nl/assets/train-kit

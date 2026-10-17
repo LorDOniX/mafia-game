@@ -1,7 +1,7 @@
 import { createProgram, type Program } from './shader';
 import { createMesh, type Mesh } from './mesh';
 import { createTexture2D } from './texture';
-import type { LoadedModel } from './gltf';
+import type { LoadedModel, RGBA } from './gltf';
 import { multiply, type Mat4 } from '@/math/mat4';
 import type { Vec3 } from '@/math/vec3';
 import vertexSource from '@/shaders/model.vert.glsl?raw';
@@ -9,9 +9,8 @@ import fragmentSource from '@/shaders/model.frag.glsl?raw';
 
 /** A model uploaded to the GPU: one mesh per part, sharing one texture. */
 export interface Model {
-  parts: Array<{ name: string; matrix: Mat4; mesh: Mesh }>;
+  parts: Array<{ name: string; matrix: Mat4; mesh: Mesh; baseColor: RGBA }>;
   texture: WebGLTexture;
-  baseColor: readonly [number, number, number, number];
   doubleSided: boolean;
 }
 
@@ -55,6 +54,7 @@ export class ModelPass {
       parts: data.parts.map((part) => ({
         name: part.name,
         matrix: part.matrix,
+        baseColor: part.baseColor,
         mesh: createMesh(gl, part.vertices, part.indices, this.program.attributes, [
           { name: 'a_position', size: 3 },
           { name: 'a_normal', size: 3 },
@@ -62,7 +62,6 @@ export class ModelPass {
         ]),
       })),
       texture: createTexture2D(gl, image),
-      baseColor: data.baseColor,
       doubleSided: data.doubleSided,
     };
   }
@@ -93,7 +92,6 @@ export class ModelPass {
     for (const { model, transform, pose } of instances) {
       if (model.doubleSided) gl.disable(gl.CULL_FACE);
       gl.bindTexture(gl.TEXTURE_2D, model.texture);
-      if (u['u_baseColor']) gl.uniform4fv(u['u_baseColor'], model.baseColor);
 
       for (const part of model.parts) {
         multiply(transform, part.matrix, this.partMatrix);
@@ -101,6 +99,7 @@ export class ModelPass {
         const world = extra ? multiply(this.partMatrix, extra, this.posedMatrix) : this.partMatrix;
 
         if (u['u_model']) gl.uniformMatrix4fv(u['u_model'], false, world);
+        if (u['u_baseColor']) gl.uniform4fv(u['u_baseColor'], part.baseColor);
         part.mesh.draw();
       }
 

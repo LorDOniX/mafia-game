@@ -9,19 +9,26 @@ import { CityCollision } from '@/city/collision';
 import {
   CUSTOM_FACADES,
   loadCityAssets,
-  loadVehicleModel,
+  loadOptionalModel,
+  PARK_TREES,
   POLICE,
   POLICE_COUNT,
+  STREET_TREES,
+  TREE_MODELS,
   VEHICLE,
+  type TreeSpecies,
 } from '@/city/assets';
 import { applyCustomFacades } from '@/city/facades';
+import { speciesAt, treeTransform } from '@/city/trees';
 import { DriveController } from '@/core/drive';
 import { createRng } from '@/core/rng';
 import { PARKED, Vehicle } from '@/vehicle/vehicle';
 import { fitVehicle, vehiclePose, vehicleTransform } from '@/vehicle/model';
 import { randomLoop, RouteDriver } from '@/vehicle/traffic';
 import { Minimap, type MapCar } from '@/ui/minimap';
+import { bakeInstances } from '@/gfx/batch';
 import type { ModelInstance } from '@/gfx/model';
+import { identity } from '@/math/mat4';
 
 const HUD_INTERVAL = 0.25;
 const PLAYER_CAR_COLOR = '#e0b84a';
@@ -71,14 +78,30 @@ async function main(): Promise<void> {
   // renderer itself stays synchronous.
   const defaultPrompt = prompt.textContent ?? 'Click to enter the city';
   prompt.textContent = 'Building Lost Heaven\u2026';
-  const [assets, carModel, policeModel] = await Promise.all([
+  const species = Object.keys(TREE_MODELS) as TreeSpecies[];
+  const [assets, carModel, policeModel, treeModels] = await Promise.all([
     loadCityAssets(),
-    loadVehicleModel(),
-    loadVehicleModel(POLICE),
+    loadOptionalModel(VEHICLE.url),
+    loadOptionalModel(POLICE.url),
+    Promise.all(species.map((s) => loadOptionalModel(TREE_MODELS[s].url))),
   ]);
   prompt.textContent = defaultPrompt;
 
   const renderer = new Renderer(ctx, layout, assets);
+
+  // Every tree of a species is merged into one static model, drawn in place.
+  const trees: ModelInstance[] = species.flatMap((s, i) => {
+    const loaded = treeModels[i];
+    if (!loaded) return [];
+    const transforms = layout.trees
+      .filter((spot) => speciesAt(spot, STREET_TREES, PARK_TREES) === s)
+      .map((spot) =>
+        treeTransform(spot, loaded.data, TREE_MODELS[s].height, layout.config.sidewalkHeight),
+      );
+    if (transforms.length === 0) return [];
+    const data = bakeInstances(loaded.data, transforms);
+    return [{ model: renderer.createModel({ data, image: loaded.image }), transform: identity() }];
+  });
 
   // Parked just past the spawn crossroads, in the right-hand lane of the
   // avenue the player starts out looking down.
@@ -148,16 +171,14 @@ async function main(): Promise<void> {
 
     for (const patrol of patrols) patrol.update(dt, collision);
 
-    const instances: ModelInstance[] =
-      car && vehicle
-        ? [
-            {
-              model: car.model,
-              transform: vehicleTransform(vehicle, car.fit),
-              pose: vehiclePose(vehicle, VEHICLE),
-            },
-          ]
-        : [];
+    const instances: ModelInstance[] = [...trees];
+    if (car && vehicle) {
+      instances.push({
+        model: car.model,
+        transform: vehicleTransform(vehicle, car.fit),
+        pose: vehiclePose(vehicle, VEHICLE),
+      });
+    }
     if (police) {
       for (const { vehicle: patrol } of patrols) {
         instances.push({

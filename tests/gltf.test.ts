@@ -53,8 +53,28 @@ describe('parseGlb', () => {
 
   it('finds the external colour map and the material flags', () => {
     expect(model.image).toEqual({ kind: 'uri', uri: 'Textures/colormap.png' });
-    expect(model.baseColor).toEqual([1, 1, 1, 1]);
+    expect(model.parts.every((part) => part.baseColor.every((c) => c === 1))).toBe(true);
     expect(model.doubleSided).toBe(true);
+  });
+
+  it('splits a mesh with several materials into one coloured part each', () => {
+    const tree = readFileSync(
+      fileURLToPath(new URL('../public/models/tree_oak.glb', import.meta.url)),
+    );
+    const data = parseGlb(
+      tree.buffer.slice(tree.byteOffset, tree.byteOffset + tree.byteLength) as ArrayBuffer,
+    );
+
+    expect(data.parts.map((part) => part.name)).toEqual(['tree_oak', 'tree_oak']);
+    const [crown, trunk] = data.parts;
+    // Leaves are green-dominant, bark red-dominant.
+    expect(crown?.baseColor[1]).toBeGreaterThan(crown?.baseColor[0] ?? 1);
+    expect(trunk?.baseColor[0]).toBeGreaterThan(trunk?.baseColor[1] ?? 1);
+    // Each part keeps only the vertices its own triangles use.
+    for (const part of data.parts) {
+      const used = new Set(part.indices);
+      expect(used.size).toBe(part.vertices.length / FLOATS_PER_MODEL_VERTEX);
+    }
   });
 
   it('rejects files that are not GLB', () => {

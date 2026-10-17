@@ -37,6 +37,7 @@ export function createSurfaceTextures(): HTMLCanvasElement[] {
   textures[TextureLayer.Brick] = drawBrickFacade();
   textures[TextureLayer.Plaster] = drawPlasterFacade();
   textures[TextureLayer.Roof] = drawRoof();
+  textures[TextureLayer.Grass] = drawGrass();
   return textures;
 }
 
@@ -165,6 +166,58 @@ function fillWrapped(
       ctx.fillRect(x + dx, y + dy, w, h);
     }
   }
+}
+
+function drawGrass(): HTMLCanvasElement {
+  const { canvas, ctx } = createCanvas();
+  const rng = createRng(44);
+
+  ctx.fillStyle = '#4c6a32';
+  ctx.fillRect(0, 0, ART_SIZE, ART_SIZE);
+
+  // Drawn at every wrap offset, so blotches crossing an edge stay seamless.
+  const wrapped = (draw: (dx: number, dy: number) => void): void => {
+    for (const dx of [0, -ART_SIZE, ART_SIZE]) {
+      for (const dy of [0, -ART_SIZE, ART_SIZE]) draw(dx, dy);
+    }
+  };
+
+  // Patchy lawn: drier and lusher areas.
+  for (let i = 0; i < 60; i++) {
+    const x = rng.range(0, ART_SIZE);
+    const y = rng.range(0, ART_SIZE);
+    const rx = rng.range(30, 110);
+    const ry = rng.range(20, 80);
+    const angle = rng.range(0, Math.PI);
+    const dry = rng.chance(0.4);
+    ctx.fillStyle = dry ? 'rgba(122,128,62,0.22)' : 'rgba(38,78,30,0.25)';
+    wrapped((dx, dy) => {
+      ctx.beginPath();
+      ctx.ellipse(x + dx, y + dy, rx, ry, angle, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
+
+  // Blades, short strokes in light and dark greens.
+  ctx.lineWidth = 1.4;
+  for (let i = 0; i < 9000; i++) {
+    const x = rng.range(0, ART_SIZE);
+    const y = rng.range(0, ART_SIZE);
+    const length = rng.range(4, 10);
+    const lean = rng.range(-0.5, 0.5);
+    const g = Math.floor(rng.range(80, 140));
+    ctx.strokeStyle = `rgba(${Math.floor(g * 0.55)},${g},${Math.floor(g * 0.4)},0.55)`;
+    wrapped((dx, dy) => {
+      if (x + dx < -12 || x + dx > ART_SIZE + 12 || y + dy < -12 || y + dy > ART_SIZE + 12) return;
+      ctx.beginPath();
+      ctx.moveTo(x + dx, y + dy);
+      ctx.lineTo(x + dx + lean * length, y + dy - length);
+      ctx.stroke();
+    });
+  }
+
+  addGrain(ctx, rng, 18);
+  return canvas;
 }
 
 function drawAsphalt(): HTMLCanvasElement {

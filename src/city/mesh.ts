@@ -27,6 +27,7 @@ const SINGLE_BAY: FacadeSpan = { bays: 1, storeys: 1 };
 const ASPHALT_TILE = 6;
 const SIDEWALK_TILE = 4;
 const COBBLE_TILE = 2.5;
+const GRASS_TILE = 5;
 const ROOF_TILE = 6;
 
 /**
@@ -361,7 +362,8 @@ export function buildCityMesh(layout: CityLayout): MeshData {
       SIDEWALK_TILE,
     );
 
-    builder.ground(plot, kerb, TextureLayer.Cobble, COBBLE_TILE);
+    if (block.isPark) builder.ground(plot, kerb, TextureLayer.Grass, GRASS_TILE);
+    else builder.ground(plot, kerb, TextureLayer.Cobble, COBBLE_TILE);
 
     // Kerb face, so the step up from the road is visible rather than implied.
     // It starts at the ground plane, not at zero, so no gap shows at the base.
