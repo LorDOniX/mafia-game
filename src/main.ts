@@ -20,19 +20,23 @@ import {
 } from '@/city/assets';
 import { applyCustomFacades } from '@/city/facades';
 import { speciesAt, treeTransform } from '@/city/trees';
+import { createLampModel, lampLight, lampTransform } from '@/city/lamp';
 import { DriveController } from '@/core/drive';
 import { createRng } from '@/core/rng';
 import { PARKED, Vehicle } from '@/vehicle/vehicle';
-import { fitVehicle, vehiclePose, vehicleTransform } from '@/vehicle/model';
+import { fitVehicle, headlight, vehiclePose, vehicleTransform } from '@/vehicle/model';
 import { randomLoop, RouteDriver } from '@/vehicle/traffic';
 import { Minimap, type MapCar } from '@/ui/minimap';
 import { bakeInstances } from '@/gfx/batch';
+import { MAX_LIGHTS, nearestLights } from '@/gfx/lights';
 import type { ModelInstance } from '@/gfx/model';
 import { identity } from '@/math/mat4';
 
 const HUD_INTERVAL = 0.25;
 const PLAYER_CAR_COLOR = '#e0b84a';
 const POLICE_COLOR = '#3f7bff';
+/** Shader light slots kept for headlights; street lamps get the rest. */
+const HEADLIGHT_SLOTS = 8;
 
 async function main(): Promise<void> {
   const canvas = document.querySelector<HTMLCanvasElement>('#gl');
@@ -43,6 +47,7 @@ async function main(): Promise<void> {
   const minimapCanvas = document.querySelector<HTMLCanvasElement>('#minimap');
   const speedo = document.querySelector<HTMLElement>('#speedo');
   const speedoValue = speedo?.querySelector<HTMLElement>('.value');
+  const dayNight = document.querySelector<HTMLButtonElement>('#daynight');
 
   if (
     !canvas ||
@@ -52,7 +57,8 @@ async function main(): Promise<void> {
     !hud ||
     !minimapCanvas ||
     !speedo ||
-    !speedoValue
+    !speedoValue ||
+    !dayNight
   ) {
     throw new Error('Missing required DOM nodes');
   }
@@ -103,6 +109,31 @@ async function main(): Promise<void> {
     return [{ model: renderer.createModel({ data, image: loaded.image }), transform: identity() }];
   });
 
+  const kerb = layout.config.sidewalkHeight;
+  const lamps: ModelInstance = {
+    model: renderer.createModel({
+      data: bakeInstances(
+        createLampModel(),
+        layout.lamps.map((spot) => lampTransform(spot, kerb)),
+      ),
+      image: null,
+    }),
+    transform: identity(),
+  };
+  const lampLights = layout.lamps.map((spot) => lampLight(spot, kerb));
+
+  let night = false;
+  const setNight = (value: boolean): void => {
+    night = value;
+    dayNight.textContent = night ? 'Switch to day (N)' : 'Switch to night (N)';
+  };
+  setNight(false);
+  dayNight.addEventListener('click', (event) => {
+    // The document-wide click would otherwise grab the mouse.
+    event.stopPropagation();
+    setNight(!night);
+  });
+
   // Parked just past the spawn crossroads, in the right-hand lane of the
   // avenue the player starts out looking down.
   const car = carModel && {
@@ -140,14 +171,25 @@ async function main(): Promise<void> {
     prompt.textContent = 'Could not capture the mouse \u2014 click again';
   });
   document.addEventListener('pointerlockchange', () => {
-    if (document.pointerLockElement) prompt.textContent = defaultPrompt;
+    prompt.textContent = document.pointerLockElement
+      ? defaultPrompt
+      : 'Paused \u2014 click to continue';
   });
 
   overlay.hidden = false;
   let hudTimer = 0;
   let fps = 0;
 
-  startLoop(({ dt, elapsed }) => {
+  /** Headlights of moving traffic and the driven car, then the nearest lamps. */
+  const sceneLights = (): ReturnType<typeof nearestLights> => {
+    const cars = patrols.map((p) => p.vehicle);
+    if (vehicle && driving) cars.push(vehicle);
+    const beams = nearestLights(cars.map(headlight), camera.position, HEADLIGHT_SLOTS);
+    return [...beams, ...nearestLights(lampLights, camera.position, MAX_LIGHTS - beams.length)];
+  };
+
+  let playTime = 0;
+  const simulate = (dt: number): void => {
     if (vehicle && input.wasPressed('KeyE')) {
       if (driving) {
         const exit = drive.exitPoint(vehicle);
@@ -170,8 +212,18 @@ async function main(): Promise<void> {
     else controller.update(dt);
 
     for (const patrol of patrols) patrol.update(dt, collision);
+  };
 
-    const instances: ModelInstance[] = [...trees];
+  startLoop(({ dt }) => {
+    // The menu is up whenever the mouse is free; the world holds still behind it.
+    const paused = !input.pointerLocked;
+    if (!paused) {
+      playTime += dt;
+      simulate(dt);
+    }
+    if (input.wasPressed('KeyN')) setNight(!night);
+
+    const instances: ModelInstance[] = [...trees, lamps];
     if (car && vehicle) {
       instances.push({
         model: car.model,
@@ -188,7 +240,7 @@ async function main(): Promise<void> {
         });
       }
     }
-    renderer.render(camera, instances);
+    renderer.render(camera, instances, { night, lights: night ? sceneLights() : [] });
     input.endFrame();
 
     minimap.draw(
@@ -221,7 +273,7 @@ async function main(): Promise<void> {
       hud.textContent =
         `${fps.toFixed(0)} fps  |  ${renderer.stats.triangles.toLocaleString()} tris  |  ` +
         `${driving && vehicle ? `drive ${Math.abs(vehicle.speed * 3.6).toFixed(0)} km/h` : controller.mode}  |  x ${p.x.toFixed(1)}  y ${p.y.toFixed(1)}  z ${p.z.toFixed(1)}  |  ` +
-        `${elapsed.toFixed(0)}s`;
+        `${playTime.toFixed(0)}s`;
     }
   });
 }

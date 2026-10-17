@@ -74,6 +74,13 @@ export interface TreeSpot {
   size: number;
 }
 
+export interface LampSpot {
+  x: number;
+  z: number;
+  /** Turns the lamp's arm (model +Z) out over the road; see `rotationY`. */
+  rotation: number;
+}
+
 export interface CityConfig {
   seed: number;
   /** Blocks per side; the city is always square. */
@@ -92,6 +99,8 @@ export interface CityConfig {
   parkChance: number;
   /** Gap between street trees along a sidewalk, metres. */
   streetTreeSpacing: number;
+  /** Gap between street lamps along a sidewalk, besides the one on every corner. */
+  lampSpacing: number;
 }
 
 export const DEFAULT_CITY_CONFIG: CityConfig = {
@@ -108,6 +117,7 @@ export const DEFAULT_CITY_CONFIG: CityConfig = {
   plazaChance: 0.09,
   parkChance: 0.3,
   streetTreeSpacing: 14 * 3,
+  lampSpacing: 60,
 };
 
 export interface CityLayout {
@@ -115,6 +125,7 @@ export interface CityLayout {
   blocks: Block[];
   buildings: Building[];
   trees: TreeSpot[];
+  lamps: LampSpot[];
   /** Full extent of the ground plane, streets included. */
   bounds: Rect;
   /** Centre-to-centre distance between adjacent blocks. */
@@ -183,11 +194,13 @@ export function generateCity(overrides: Partial<CityConfig> = {}): CityLayout {
   }
 
   const span = config.gridSize * pitch;
+  const trees = plantTrees(blocks, config, greenRng);
   return {
     config,
     blocks,
     buildings,
-    trees: plantTrees(blocks, config, greenRng),
+    trees,
+    lamps: placeLamps(blocks, config, trees),
     bounds: { minX: 0, minZ: 0, maxX: span, maxZ: span },
     pitch,
   };
@@ -331,6 +344,55 @@ function plantTrees(
   }
 
   return trees;
+}
+
+/** Pole distance from the kerb edge of a sidewalk. */
+const LAMP_INSET = 0.6;
+/** A lamp this close to a street tree is dropped, so the crown does not swallow it. */
+const LAMP_TREE_CLEARANCE = 4;
+
+/**
+ * A lamp on every sidewalk corner, angled into the crossroads, and more along
+ * each side, arms out over the road.
+ */
+function placeLamps(
+  blocks: readonly Block[],
+  config: CityConfig,
+  trees: readonly TreeSpot[],
+): LampSpot[] {
+  const lamps: LampSpot[] = [];
+  const clearOfTrees = (x: number, z: number): boolean =>
+    !trees.some(
+      (t) => t.kind === 'street' && Math.hypot(t.x - x, t.z - z) < LAMP_TREE_CLEARANCE,
+    );
+  // Outward normals of the sides `rectSides` returns, in the same order.
+  const outward = [
+    { x: 0, z: -1 },
+    { x: 0, z: 1 },
+    { x: -1, z: 0 },
+    { x: 1, z: 0 },
+  ];
+
+  for (const { sidewalk: s } of blocks) {
+    const i = LAMP_INSET;
+    for (const [x, z, dx, dz] of [
+      [s.minX + i, s.minZ + i, -1, -1],
+      [s.maxX - i, s.minZ + i, 1, -1],
+      [s.minX + i, s.maxZ - i, -1, 1],
+      [s.maxX - i, s.maxZ - i, 1, 1],
+    ] as const) {
+      lamps.push({ x, z, rotation: Math.atan2(dx, dz) });
+    }
+
+    rectSides(s, i).forEach((side, k) => {
+      const out = outward[k] ?? { x: 0, z: 1 };
+      for (const p of evenlyAlong(side, CORNER_CLEARANCE, config.lampSpacing)) {
+        if (clearOfTrees(p.x, p.z)) lamps.push({ ...p, rotation: Math.atan2(out.x, out.z) });
+      }
+    });
+  }
+
+  return lamps;
 }
 
 interface Segment {

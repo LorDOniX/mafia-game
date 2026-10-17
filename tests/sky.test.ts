@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { directionToEquirectUV, faceDirection, panoramaToSkyFaces } from '@/city/sky';
+import {
+  createNightSkyFaces,
+  directionToEquirectUV,
+  faceDirection,
+  NIGHT_HORIZON_COLOR,
+  panoramaToSkyFaces,
+} from '@/city/sky';
 import { sampleBilinear } from '@/gfx/image';
 import { normalize } from '@/math/vec3';
 
@@ -129,6 +135,30 @@ describe('panoramaToSkyFaces', () => {
     // +X sits at u = 0.75 (green half), -X at u = 0.25 (red half).
     expect(plusX.data[1]).toBeGreaterThan(plusX.data[0] ?? 0);
     expect(minusX.data[0]).toBeGreaterThan(minusX.data[1] ?? 0);
+  });
+});
+
+describe('createNightSkyFaces', () => {
+  const faces = createNightSkyFaces(64);
+  const up = faces[2];
+  if (!up) throw new Error('expected six faces');
+  const texels = Array.from({ length: 64 * 64 }, (_, i) => up.data.subarray(i * 4, i * 4 + 3));
+
+  it('is dark overhead, with a scatter of stars', () => {
+    const dark = texels.filter(([r = 0, g = 0, b = 0]) => r + g + b < 30);
+    const stars = texels.filter(([r = 0, g = 0, b = 0]) => r + g + b > 150);
+
+    expect(dark.length).toBeGreaterThan(texels.length * 0.95);
+    expect(stars.length).toBeGreaterThan(0);
+  });
+
+  it('meets the night fog colour at the horizon', () => {
+    // Middle row of a side face looks straight at the horizon.
+    const side = faces[4];
+    if (!side) throw new Error('expected six faces');
+    const i = (32 * 64 + 32) * 4;
+    expect(side.data[i]).toBeCloseTo(NIGHT_HORIZON_COLOR[0] * 255, -1);
+    expect(side.data[i + 2]).toBeCloseTo(NIGHT_HORIZON_COLOR[2] * 255, -1);
   });
 });
 

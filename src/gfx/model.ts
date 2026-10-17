@@ -1,7 +1,8 @@
 import { createProgram, type Program } from './shader';
 import { createMesh, type Mesh } from './mesh';
 import { createTexture2D } from './texture';
-import type { LoadedModel, RGBA } from './gltf';
+import type { LoadedModel, RGB as MutableRGB, RGBA } from './gltf';
+import { withLights, type LightBuffer } from './lights';
 import { multiply, type Mat4 } from '@/math/mat4';
 import type { Vec3 } from '@/math/vec3';
 import vertexSource from '@/shaders/model.vert.glsl?raw';
@@ -9,7 +10,13 @@ import fragmentSource from '@/shaders/model.frag.glsl?raw';
 
 /** A model uploaded to the GPU: one mesh per part, sharing one texture. */
 export interface Model {
-  parts: Array<{ name: string; matrix: Mat4; mesh: Mesh; baseColor: RGBA }>;
+  parts: Array<{
+    name: string;
+    matrix: Mat4;
+    mesh: Mesh;
+    baseColor: RGBA;
+    emissive: MutableRGB;
+  }>;
   texture: WebGLTexture;
   doubleSided: boolean;
 }
@@ -36,6 +43,9 @@ export interface Lighting {
   ambient: RGB;
   fogColor: RGB;
   fogDensity: number;
+  lights: LightBuffer;
+  /** 1 with the lights on, 0 by day: scales every part's glow. */
+  emissiveScale: number;
 }
 
 export class ModelPass {
@@ -44,7 +54,7 @@ export class ModelPass {
   private readonly posedMatrix: Mat4 = new Float32Array(16);
 
   constructor(private readonly gl: WebGL2RenderingContext) {
-    this.program = createProgram(gl, vertexSource, fragmentSource);
+    this.program = createProgram(gl, vertexSource, withLights(fragmentSource));
   }
 
   createModel({ data, image }: LoadedModel): Model {
@@ -55,6 +65,7 @@ export class ModelPass {
         name: part.name,
         matrix: part.matrix,
         baseColor: part.baseColor,
+        emissive: part.emissive,
         mesh: createMesh(gl, part.vertices, part.indices, this.program.attributes, [
           { name: 'a_position', size: 3 },
           { name: 'a_normal', size: 3 },
@@ -87,6 +98,7 @@ export class ModelPass {
     if (u['u_fogColor']) gl.uniform3fv(u['u_fogColor'], lighting.fogColor);
     if (u['u_fogDensity']) gl.uniform1f(u['u_fogDensity'], lighting.fogDensity);
     if (u['u_texture']) gl.uniform1i(u['u_texture'], 0);
+    lighting.lights.upload(gl, u);
     gl.activeTexture(gl.TEXTURE0);
 
     for (const { model, transform, pose } of instances) {
@@ -100,6 +112,11 @@ export class ModelPass {
 
         if (u['u_model']) gl.uniformMatrix4fv(u['u_model'], false, world);
         if (u['u_baseColor']) gl.uniform4fv(u['u_baseColor'], part.baseColor);
+        if (u['u_emissive']) {
+          const [r, g, b] = part.emissive;
+          const s = lighting.emissiveScale;
+          gl.uniform3f(u['u_emissive'], r * s, g * s, b * s);
+        }
         part.mesh.draw();
       }
 

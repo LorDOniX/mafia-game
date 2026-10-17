@@ -1,3 +1,5 @@
-- přidat skok na mezerník
-- při řízení auta zobrazit hud s rychlostí auta
-- v pravém rohu mini mapa s akutální polohou a výřezem, který jde vidět, udělat jako oko, které svírá úhel zobrazení podle šířky obrazovky (fov); zobrazit všechny auta jakon obdélníčky, které budou zobrazovat aktuální polohu
+- přidání přepnutí do weboky den/noc
+- rozmístnit lampy po mapě - kdyžtak zase pořešíme modely + textury
+- jestli jiný skybox? bude tma
+- osvětlovat celou scénu pouze lampami, dopad světla přes kužel
+- auta budou svítit před sebe

@@ -4,7 +4,7 @@ popis pro lamu do md, grafika jak všechno funguje, hlavně grafika
 přepis do threejs
 --
 chodci - https://kenney.nl/assets/blocky-characters
-lampy - osvětlení
+lampy - osvětlení - hotovo
 skybox - hotogo
 smysl hry?
 pauznutí hry, kolize

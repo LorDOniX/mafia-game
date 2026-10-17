@@ -3,9 +3,10 @@ import { rectContains, type CityLayout, type Rect } from './layout';
 const CELL_SIZE = 20;
 /** Half the side of the square that stands in for a tree trunk. */
 export const TRUNK_RADIUS = 0.3;
+export const LAMP_POST_RADIUS = 0.15;
 
 /**
- * Uniform grid over building footprints and tree trunks.
+ * Uniform grid over building footprints, tree trunks and lamp posts.
  *
  * The city is a few hundred metres across with ~700 buildings, so testing every
  * footprint per frame would be wasteful; bucketing by cell keeps each query to a
@@ -20,14 +21,16 @@ export class CityCollision {
     this.bounds = layout.bounds;
     this.columns = Math.ceil((this.bounds.maxX - this.bounds.minX) / CELL_SIZE) + 1;
 
-    const trunks = layout.trees.map(({ x, z }) => ({
-      minX: x - TRUNK_RADIUS,
-      maxX: x + TRUNK_RADIUS,
-      minZ: z - TRUNK_RADIUS,
-      maxZ: z + TRUNK_RADIUS,
-    }));
+    const post = (x: number, z: number, r: number): Rect => ({
+      minX: x - r,
+      maxX: x + r,
+      minZ: z - r,
+      maxZ: z + r,
+    });
+    const trunks = layout.trees.map(({ x, z }) => post(x, z, TRUNK_RADIUS));
+    const lampPosts = layout.lamps.map(({ x, z }) => post(x, z, LAMP_POST_RADIUS));
 
-    for (const rect of [...layout.buildings.map((b) => b.footprint), ...trunks]) {
+    for (const rect of [...layout.buildings.map((b) => b.footprint), ...trunks, ...lampPosts]) {
       const minI = this.cellIndex(rect.minX);
       const maxI = this.cellIndex(rect.maxX);
       const minJ = this.cellIndex(rect.minZ);

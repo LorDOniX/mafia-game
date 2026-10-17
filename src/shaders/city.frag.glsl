@@ -20,6 +20,8 @@ uniform float u_fogDensity;
 /** Scales normal-map strength; 0 falls back to the flat geometric normal. */
 uniform float u_normalStrength;
 
+#include "lights.glsl"
+
 out vec4 outColor;
 
 void main() {
@@ -42,7 +44,7 @@ void main() {
   // Cheap sky bounce: up-facing surfaces collect more ambient than down-facing.
   float sky = 0.5 + 0.5 * n.y;
 
-  vec3 lit = albedo * (u_ambient * sky + u_sunColor * sun);
+  vec3 lit = albedo * (u_ambient * sky + u_sunColor * sun + spotLights(v_worldPos, n));
 
   // Exponential-squared fog, tuned to match the skybox horizon so the city
   // dissolves into the sky instead of ending at a hard edge.

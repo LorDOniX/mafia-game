@@ -46,7 +46,7 @@ export const SURFACE_TEXTURES: Partial<Record<TextureLayer, string>> = {
   // [TextureLayer.Plaster]: '/textures/plaster.png',
   // [TextureLayer.Roof]: '/textures/roof.png',
   // Park lawns, tiled freely; e.g. an ambientCG "Grass" swatch.
-  // [TextureLayer.Grass]: '/textures/park/grass.jpg',
+  [TextureLayer.Grass]: '/textures/park/grass.png',
 };
 
 /**

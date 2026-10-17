@@ -112,6 +112,7 @@ describe('custom facade walls', () => {
     ],
     buildings: [building],
     trees: [],
+    lamps: [],
     bounds: { minX: 0, minZ: 0, maxX: 240, maxZ: 240 },
     pitch: DEFAULT_CITY_CONFIG.blockSize + DEFAULT_CITY_CONFIG.streetWidth,
   };

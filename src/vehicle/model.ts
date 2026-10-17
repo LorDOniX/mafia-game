@@ -9,6 +9,7 @@ import {
   type Mat4,
 } from '@/math/mat4';
 import type { Vec3 } from '@/math/vec3';
+import type { SpotLight } from '@/gfx/lights';
 import type { Vehicle, VehicleBody } from './vehicle';
 
 /**
@@ -115,6 +116,42 @@ export function vehiclePose(
     // The model's right is -X, so steering right turns the wheel's +Z nose
     // toward -X: a negative angle about +Y.
     return multiply(rotationY(-vehicle.steer), roll);
+  };
+}
+
+const HEADLIGHT_HEIGHT = 0.7;
+/** Beams dip slightly so they light the road rather than the cars ahead. */
+const HEADLIGHT_DIP = 0.05;
+const HEADLIGHT_COLOR: readonly [number, number, number] = [1.0, 0.94, 0.82];
+const HEADLIGHT_INTENSITY = 220;
+const HEADLIGHT_RANGE = 80;
+/** Half-angles, radians: a tight core that throws far, with a softer spill. */
+const HEADLIGHT_INNER = 0.15;
+const HEADLIGHT_OUTER = 0.4;
+
+/**
+ * Both headlamps as one beam from the middle of the bonnet: half the cost in
+ * the shader, and at a car's width apart the two would light the same patch.
+ */
+export function headlight(vehicle: Vehicle): SpotLight {
+  const f = vehicle.forward();
+  const ahead = vehicle.body.length / 2 + 0.1;
+  const length = Math.hypot(f.x, HEADLIGHT_DIP, f.z);
+  return {
+    position: {
+      x: vehicle.x + f.x * ahead,
+      y: vehicle.y + HEADLIGHT_HEIGHT,
+      z: vehicle.z + f.z * ahead,
+    },
+    direction: { x: f.x / length, y: -HEADLIGHT_DIP / length, z: f.z / length },
+    color: [
+      HEADLIGHT_COLOR[0] * HEADLIGHT_INTENSITY,
+      HEADLIGHT_COLOR[1] * HEADLIGHT_INTENSITY,
+      HEADLIGHT_COLOR[2] * HEADLIGHT_INTENSITY,
+    ],
+    range: HEADLIGHT_RANGE,
+    inner: HEADLIGHT_INNER,
+    outer: HEADLIGHT_OUTER,
   };
 }
 

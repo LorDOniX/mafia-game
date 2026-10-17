@@ -12,6 +12,15 @@ export const HORIZON_COLOR: [number, number, number] = [0.74, 0.76, 0.75];
 const ZENITH_COLOR: [number, number, number] = [0.21, 0.38, 0.66];
 const GROUND_COLOR: [number, number, number] = [0.3, 0.29, 0.27];
 
+/** Night haze at eye level, lifted a touch by the city's own glow; night fog fades to it. */
+export const NIGHT_HORIZON_COLOR: [number, number, number] = [0.05, 0.05, 0.065];
+const NIGHT_ZENITH_COLOR: [number, number, number] = [0.004, 0.006, 0.018];
+const NIGHT_GROUND_COLOR: [number, number, number] = [0.01, 0.01, 0.012];
+/** Share of sky texels that hold a star. */
+const STAR_DENSITY = 0.004;
+
+type SkyShader = (dir: Vec3, face: number, px: number, py: number) => [number, number, number];
+
 /**
  * Cube map faces in the order WebGL expects: +X, -X, +Y, -Y, +Z, -Z.
  *
@@ -19,7 +28,12 @@ const GROUND_COLOR: [number, number, number] = [0.3, 0.29, 0.27];
  * keeps the sky consistent with `SUN_DIRECTION` without needing any artwork.
  */
 export function createSkyFaces(size = SKY_FACE_SIZE): ImageData[] {
-  return [0, 1, 2, 3, 4, 5].map((face) => renderFace(face, size));
+  return [0, 1, 2, 3, 4, 5].map((face) => renderFace(face, size, shadeSky));
+}
+
+/** A moonless night: near-black overhead, a faint glow at the horizon, and stars. */
+export function createNightSkyFaces(size = SKY_FACE_SIZE): ImageData[] {
+  return [0, 1, 2, 3, 4, 5].map((face) => renderFace(face, size, shadeNightSky));
 }
 
 /**
@@ -68,7 +82,7 @@ export function panoramaToSkyFaces(panorama: ImageData, size = SKY_FACE_SIZE): I
   });
 }
 
-function renderFace(face: number, size: number): ImageData {
+function renderFace(face: number, size: number, shade: SkyShader): ImageData {
   const image = new ImageData(size, size);
   const { data } = image;
 
@@ -78,7 +92,7 @@ function renderFace(face: number, size: number): ImageData {
     for (let px = 0; px < size; px++) {
       const u = (2 * (px + 0.5)) / size - 1;
       const dir = normalize(faceDirection(face, u, v));
-      const [r, g, b] = shadeSky(dir);
+      const [r, g, b] = shade(dir, face, px, py);
 
       const i = (py * size + px) * 4;
       data[i] = Math.round(Math.min(r, 1) * 255);
@@ -155,6 +169,31 @@ function shadeSky(dir: Vec3): [number, number, number] {
     r = Math.min(r + glow * 1.0 + disc, 1);
     g = Math.min(g + glow * 0.92 + disc, 1);
     b = Math.min(b + glow * 0.72 + disc, 1);
+  }
+
+  return [r, g, b];
+}
+
+function shadeNightSky(dir: Vec3, face: number, px: number, py: number): [number, number, number] {
+  if (dir.y < 0) {
+    const down = Math.min(-dir.y / 0.25, 1);
+    return [0, 1, 2].map((k) =>
+      lerp(NIGHT_HORIZON_COLOR[k] ?? 0, NIGHT_GROUND_COLOR[k] ?? 0, down),
+    ) as [number, number, number];
+  }
+
+  const gradient = Math.pow(dir.y, 0.35);
+  let [r, g, b] = [0, 1, 2].map((k) =>
+    lerp(NIGHT_HORIZON_COLOR[k] ?? 0, NIGHT_ZENITH_COLOR[k] ?? 0, gradient),
+  ) as [number, number, number];
+
+  // One texel per star; the haze near the horizon swallows them.
+  const h = hash(px + face * 4096, py);
+  if (h > 1 - STAR_DENSITY) {
+    const brightness = ((h - (1 - STAR_DENSITY)) / STAR_DENSITY) * smoothstep(0.04, 0.3, dir.y);
+    r = Math.min(r + brightness * 0.9, 1);
+    g = Math.min(g + brightness * 0.92, 1);
+    b = Math.min(b + brightness, 1);
   }
 
   return [r, g, b];

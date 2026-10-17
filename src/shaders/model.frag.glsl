@@ -13,6 +13,10 @@ uniform vec3 u_sunColor;
 uniform vec3 u_ambient;
 uniform vec3 u_fogColor;
 uniform float u_fogDensity;
+/** Glow that needs no light: lamp glass at night. */
+uniform vec3 u_emissive;
+
+#include "lights.glsl"
 
 out vec4 outColor;
 
@@ -27,10 +31,11 @@ void main() {
 
   float sun = max(dot(n, u_sunDir), 0.0);
   float sky = 0.5 + 0.5 * n.y;
-  vec3 lit = albedo * (u_ambient * sky + u_sunColor * sun);
+  vec3 lit = albedo * (u_ambient * sky + u_sunColor * sun + spotLights(v_worldPos, n));
 
   float dist = distance(v_worldPos, u_cameraPos);
   float fog = 1.0 - exp(-pow(dist * u_fogDensity, 2.0));
 
-  outColor = vec4(mix(lit, u_fogColor, fog), 1.0);
+  // Glowing parts cut through the haze further than lit ones.
+  outColor = vec4(mix(lit, u_fogColor, fog) + u_emissive * (1.0 - fog * 0.6), 1.0);
 }

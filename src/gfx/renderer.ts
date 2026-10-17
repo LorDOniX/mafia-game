@@ -4,8 +4,10 @@ import { createTextureArray } from './texture';
 import { Skybox } from './skybox';
 import { ModelPass, type Lighting, type Model, type ModelInstance } from './model';
 import type { LoadedModel } from './gltf';
+import { LightBuffer, withLights, type SpotLight } from './lights';
 import { buildCityMesh } from '@/city/mesh';
 import { TEXTURE_SIZE } from '@/city/textures';
+import { createNightSkyFaces, NIGHT_HORIZON_COLOR } from '@/city/sky';
 import { NORMAL_STRENGTH, type CityAssets } from '@/city/assets';
 import type { CityLayout } from '@/city/layout';
 import type { Camera } from '@/core/camera';
@@ -21,9 +23,23 @@ const AMBIENT: [number, number, number] = [0.42, 0.46, 0.54];
  */
 const FOG_DENSITY = 0.0016;
 
+/** No sun, and barely any sky light: after dark the lamps and headlights do the work. */
+const NIGHT_SUN: [number, number, number] = [0, 0, 0];
+const NIGHT_AMBIENT: [number, number, number] = [0.015, 0.018, 0.028];
+/** Thicker than by day, so unlit streets sink into the dark. */
+const NIGHT_FOG_DENSITY = 0.006;
+
 export interface RenderStats {
   triangles: number;
 }
+
+export interface SceneState {
+  night: boolean;
+  /** Already narrowed to what the shaders can take; see `nearestLights`. */
+  lights: readonly SpotLight[];
+}
+
+const DAYTIME: SceneState = { night: false, lights: [] };
 
 export class Renderer {
   private readonly gl: WebGL2RenderingContext;
@@ -32,8 +48,10 @@ export class Renderer {
   private readonly atlas: WebGLTexture;
   private readonly normals: WebGLTexture;
   private readonly skybox: Skybox;
+  private readonly nightSkybox: Skybox;
   private readonly models: ModelPass;
   private readonly sky: CityAssets['sky'];
+  private readonly lights = new LightBuffer();
 
   readonly stats: RenderStats;
 
@@ -46,7 +64,7 @@ export class Renderer {
     this.sky = assets.sky;
     const { gl } = this;
 
-    this.program = createProgram(gl, vertexSource, fragmentSource);
+    this.program = createProgram(gl, vertexSource, withLights(fragmentSource));
     this.atlas = createTextureArray(gl, assets.surfaces, TEXTURE_SIZE);
     this.normals = createTextureArray(gl, assets.normals, TEXTURE_SIZE);
 
@@ -62,21 +80,24 @@ export class Renderer {
     this.stats = { triangles: data.indices.length / 3 };
 
     this.skybox = new Skybox(gl, assets.sky.faces);
+    this.nightSkybox = new Skybox(gl, createNightSkyFaces());
     this.models = new ModelPass(gl);
 
     gl.enable(gl.DEPTH_TEST);
     gl.depthFunc(gl.LESS);
     gl.enable(gl.CULL_FACE);
     gl.cullFace(gl.BACK);
-    const horizon = assets.sky.horizonColor;
-    gl.clearColor(horizon[0], horizon[1], horizon[2], 1);
   }
 
   createModel(loaded: LoadedModel): Model {
     return this.models.createModel(loaded);
   }
 
-  render(camera: Camera, instances: readonly ModelInstance[] = []): void {
+  render(
+    camera: Camera,
+    instances: readonly ModelInstance[] = [],
+    scene: SceneState = DAYTIME,
+  ): void {
     const { gl } = this;
 
     if (this.ctx.resize()) {
@@ -84,6 +105,14 @@ export class Renderer {
     }
     camera.update();
 
+    const { night } = scene;
+    const sunColor = night ? NIGHT_SUN : SUN_COLOR;
+    const ambient = night ? NIGHT_AMBIENT : AMBIENT;
+    const fogColor = night ? NIGHT_HORIZON_COLOR : this.sky.horizonColor;
+    const fogDensity = night ? NIGHT_FOG_DENSITY : FOG_DENSITY;
+    this.lights.set(night ? scene.lights : []);
+
+    gl.clearColor(fogColor[0], fogColor[1], fogColor[2], 1);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.useProgram(this.program.program);
 
@@ -96,13 +125,14 @@ export class Renderer {
       const sun = this.sky.sunDirection;
       gl.uniform3f(u['u_sunDir'], sun.x, sun.y, sun.z);
     }
-    if (u['u_sunColor']) gl.uniform3fv(u['u_sunColor'], SUN_COLOR);
-    if (u['u_ambient']) gl.uniform3fv(u['u_ambient'], AMBIENT);
-    if (u['u_fogColor']) gl.uniform3fv(u['u_fogColor'], this.sky.horizonColor);
-    if (u['u_fogDensity']) gl.uniform1f(u['u_fogDensity'], FOG_DENSITY);
+    if (u['u_sunColor']) gl.uniform3fv(u['u_sunColor'], sunColor);
+    if (u['u_ambient']) gl.uniform3fv(u['u_ambient'], ambient);
+    if (u['u_fogColor']) gl.uniform3fv(u['u_fogColor'], fogColor);
+    if (u['u_fogDensity']) gl.uniform1f(u['u_fogDensity'], fogDensity);
     if (u['u_normalStrength']) gl.uniform1f(u['u_normalStrength'], NORMAL_STRENGTH);
     if (u['u_atlas']) gl.uniform1i(u['u_atlas'], 0);
     if (u['u_normals']) gl.uniform1i(u['u_normals'], 1);
+    this.lights.upload(gl, u);
 
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.atlas);
@@ -114,13 +144,15 @@ export class Renderer {
     const lighting: Lighting = {
       cameraPos: camera.position,
       sunDir: this.sky.sunDirection,
-      sunColor: SUN_COLOR,
-      ambient: AMBIENT,
-      fogColor: this.sky.horizonColor,
-      fogDensity: FOG_DENSITY,
+      sunColor,
+      ambient,
+      fogColor,
+      fogDensity,
+      lights: this.lights,
+      emissiveScale: night ? 1 : 0,
     };
     this.models.render(camera.viewProjection, lighting, instances);
 
-    this.skybox.render(camera.view, camera.projection);
+    (night ? this.nightSkybox : this.skybox).render(camera.view, camera.projection);
   }
 }

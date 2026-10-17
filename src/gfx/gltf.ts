@@ -30,9 +30,12 @@ export interface ModelPart {
   max: Vec3;
   /** The material's colour, multiplied over the texture. */
   baseColor: RGBA;
+  /** Light the material gives off itself, shown only while lights are on. */
+  emissive: RGB;
 }
 
 export type RGBA = [number, number, number, number];
+export type RGB = [number, number, number];
 
 /** A `uri` image is relative to the model file, as glTF specifies. */
 export type ModelImage =
@@ -99,6 +102,7 @@ interface GltfJson {
       baseColorFactor?: number[];
       baseColorTexture?: { index: number };
     };
+    emissiveFactor?: number[];
     doubleSided?: boolean;
   }>;
   textures?: Array<{ source?: number }>;
@@ -214,9 +218,8 @@ function readModel(gltf: GltfJson, bin: DataView | null): ModelData {
       }
 
       for (const [material, primitives] of byMaterial) {
-        model.parts.push(
-          readMesh(gltf, bin, primitives, name, matrix, materialColor(gltf, material)),
-        );
+        const { baseColor, emissive } = materialColor(gltf, material);
+        model.parts.push(readMesh(gltf, bin, primitives, name, matrix, baseColor, emissive));
 
         // One texture per model: the first material that names one wins.
         if (!materialSeen && material !== undefined) {
@@ -240,6 +243,7 @@ function readMesh(
   name: string,
   matrix: Mat4,
   baseColor: RGBA,
+  emissive: RGB,
 ): ModelPart {
   const vertices: number[] = [];
   const indices: number[] = [];
@@ -305,13 +309,15 @@ function readMesh(
     min,
     max,
     baseColor,
+    emissive,
   };
 }
 
-function materialColor(gltf: GltfJson, index: number | undefined): RGBA {
+function materialColor(gltf: GltfJson, index: number | undefined): { baseColor: RGBA; emissive: RGB } {
   const material = index !== undefined ? gltf.materials?.[index] : undefined;
   const [r = 1, g = 1, b = 1, a = 1] = material?.pbrMetallicRoughness?.baseColorFactor ?? [];
-  return [r, g, b, a];
+  const [er = 0, eg = 0, eb = 0] = material?.emissiveFactor ?? [];
+  return { baseColor: [r, g, b, a], emissive: [er, eg, eb] };
 }
 
 function readMaterial(gltf: GltfJson, bin: DataView | null, index: number, model: ModelData): void {
