@@ -127,12 +127,24 @@ export const VEHICLE: VehicleModelConfig = {
   steerPrefix: 'wheel-front',
 };
 
-/** The car model, or null if it fails to load: the city still works on foot. */
-export async function loadVehicleModel(): Promise<LoadedModel | null> {
+/** Police cars that patrol the streets on their own. Same kit, same wheel names. */
+export const POLICE: VehicleModelConfig = {
+  url: '/models/police.glb',
+  scale: 1.4,
+  spinPrefix: 'wheel-',
+  steerPrefix: 'wheel-front',
+};
+
+export const POLICE_COUNT = 5;
+
+/** A car model, or null if it fails to load: the city still works without it. */
+export async function loadVehicleModel(
+  config: VehicleModelConfig = VEHICLE,
+): Promise<LoadedModel | null> {
   try {
-    return await loadModel(VEHICLE.url);
+    return await loadModel(config.url);
   } catch (error) {
-    console.warn('No car this session, the model failed to load:', error);
+    console.warn(`No ${config.url} this session, the model failed to load:`, error);
     return null;
   }
 }

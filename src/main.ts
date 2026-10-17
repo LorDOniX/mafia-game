@@ -6,11 +6,20 @@ import { Camera } from '@/core/camera';
 import { FirstPersonController } from '@/core/controller';
 import { generateCity } from '@/city/layout';
 import { CityCollision } from '@/city/collision';
-import { CUSTOM_FACADES, loadCityAssets, loadVehicleModel, VEHICLE } from '@/city/assets';
+import {
+  CUSTOM_FACADES,
+  loadCityAssets,
+  loadVehicleModel,
+  POLICE,
+  POLICE_COUNT,
+  VEHICLE,
+} from '@/city/assets';
 import { applyCustomFacades } from '@/city/facades';
 import { DriveController } from '@/core/drive';
+import { createRng } from '@/core/rng';
 import { PARKED, Vehicle } from '@/vehicle/vehicle';
 import { fitVehicle, vehiclePose, vehicleTransform } from '@/vehicle/model';
+import { randomLoop, RouteDriver } from '@/vehicle/traffic';
 import type { ModelInstance } from '@/gfx/model';
 
 const HUD_INTERVAL = 0.25;
@@ -47,7 +56,11 @@ async function main(): Promise<void> {
   // renderer itself stays synchronous.
   const defaultPrompt = prompt.textContent ?? 'Click to enter the city';
   prompt.textContent = 'Building Lost Heaven\u2026';
-  const [assets, carModel] = await Promise.all([loadCityAssets(), loadVehicleModel()]);
+  const [assets, carModel, policeModel] = await Promise.all([
+    loadCityAssets(),
+    loadVehicleModel(),
+    loadVehicleModel(POLICE),
+  ]);
   prompt.textContent = defaultPrompt;
 
   const renderer = new Renderer(ctx, layout, assets);
@@ -59,6 +72,18 @@ async function main(): Promise<void> {
     model: renderer.createModel(carModel),
   };
   const vehicle = car && new Vehicle(car.fit.body, spawn - 2, spawn + 20, Math.PI);
+
+  // Each patrol car gets its own random loop and starting point on it.
+  const police = policeModel && {
+    fit: fitVehicle(policeModel.data, POLICE),
+    model: renderer.createModel(policeModel),
+  };
+  const trafficRng = createRng((Math.random() * 2 ** 32) >>> 0);
+  const patrols = police
+    ? Array.from({ length: POLICE_COUNT }, () =>
+        RouteDriver.spawn(police.fit.body, randomLoop(layout, trafficRng), trafficRng),
+      )
+    : [];
   const drive = new DriveController(camera, input, collision);
   let driving = false;
 
@@ -97,6 +122,8 @@ async function main(): Promise<void> {
     if (vehicle && driving) drive.updateCamera(dt, vehicle);
     else controller.update(dt);
 
+    for (const patrol of patrols) patrol.update(dt, collision);
+
     const instances: ModelInstance[] =
       car && vehicle
         ? [
@@ -107,6 +134,15 @@ async function main(): Promise<void> {
             },
           ]
         : [];
+    if (police) {
+      for (const { vehicle: patrol } of patrols) {
+        instances.push({
+          model: police.model,
+          transform: vehicleTransform(patrol, police.fit),
+          pose: vehiclePose(patrol, POLICE),
+        });
+      }
+    }
     renderer.render(camera, instances);
     input.endFrame();
 
