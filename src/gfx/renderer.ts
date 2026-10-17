@@ -35,7 +35,7 @@ export interface RenderStats {
 
 export interface SceneState {
   night: boolean;
-  /** Already narrowed to what the shaders can take; see `nearestLights`. */
+  /** Already narrowed to what the shaders can take; see `nearestLights`. Lit by day too. */
   lights: readonly SpotLight[];
 }
 
@@ -110,7 +110,7 @@ export class Renderer {
     const ambient = night ? NIGHT_AMBIENT : AMBIENT;
     const fogColor = night ? NIGHT_HORIZON_COLOR : this.sky.horizonColor;
     const fogDensity = night ? NIGHT_FOG_DENSITY : FOG_DENSITY;
-    this.lights.set(night ? scene.lights : []);
+    this.lights.set(scene.lights);
 
     gl.clearColor(fogColor[0], fogColor[1], fogColor[2], 1);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);

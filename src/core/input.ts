@@ -20,6 +20,7 @@ const GAME_KEYS = new Set([
   'KeyE',
   'KeyF',
   'KeyN',
+  'KeyT',
   'Space',
   'ShiftLeft',
   'ShiftRight',

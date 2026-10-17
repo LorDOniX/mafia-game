@@ -31,7 +31,8 @@ import { randomLoop, RouteDriver } from '@/vehicle/traffic';
 import { Animal, fitAnimal } from '@/animals/animal';
 import { Minimap, type MapCar } from '@/ui/minimap';
 import { bakeInstances } from '@/gfx/batch';
-import { MAX_LIGHTS, nearestLights } from '@/gfx/lights';
+import { MAX_LIGHTS, nearestLights, type SpotLight } from '@/gfx/lights';
+import { flashlight } from '@/core/flashlight';
 import type { ModelInstance } from '@/gfx/model';
 import { identity } from '@/math/mat4';
 
@@ -131,7 +132,13 @@ async function main(): Promise<void> {
   const breeds = ANIMALS.flatMap((species, i) => {
     const loaded = animalModels[i];
     return loaded
-      ? [{ species, model: renderer.createModel(loaded), fit: fitAnimal(loaded.data, species.height) }]
+      ? [
+          {
+            species,
+            model: renderer.createModel(loaded),
+            fit: fitAnimal(loaded.data, species.height),
+          },
+        ]
       : [];
   });
   const animals = breeds.length
@@ -206,12 +213,16 @@ async function main(): Promise<void> {
   let hudTimer = 0;
   let fps = 0;
 
-  /** Headlights of moving traffic and the driven car, then the nearest lamps. */
-  const sceneLights = (): ReturnType<typeof nearestLights> => {
+  let flashlightOn = false;
+  /** The flashlight first, then headlights of traffic and the driven car, then the nearest lamps. */
+  const sceneLights = (): SpotLight[] => {
+    const own = flashlightOn ? [flashlight(camera)] : [];
+    if (!night) return own;
     const cars = patrols.map((p) => p.vehicle);
     if (vehicle && driving) cars.push(vehicle);
     const beams = nearestLights(cars.map(headlight), camera.position, HEADLIGHT_SLOTS);
-    return [...beams, ...nearestLights(lampLights, camera.position, MAX_LIGHTS - beams.length)];
+    const left = MAX_LIGHTS - own.length - beams.length;
+    return [...own, ...beams, ...nearestLights(lampLights, camera.position, left)];
   };
 
   let playTime = 0;
@@ -249,6 +260,7 @@ async function main(): Promise<void> {
       simulate(dt);
     }
     if (input.wasPressed('KeyN')) setNight(!night);
+    if (input.wasPressed('KeyT')) flashlightOn = !flashlightOn;
 
     const instances: ModelInstance[] = [...trees, lamps];
     for (const { breed, animal } of animals) {
@@ -274,7 +286,7 @@ async function main(): Promise<void> {
         });
       }
     }
-    renderer.render(camera, instances, { night, lights: night ? sceneLights() : [] });
+    renderer.render(camera, instances, { night, lights: sceneLights() });
     input.endFrame();
 
     minimap.draw(

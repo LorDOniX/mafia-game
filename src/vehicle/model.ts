@@ -123,8 +123,8 @@ const HEADLIGHT_HEIGHT = 0.7;
 /** Beams dip slightly so they light the road rather than the cars ahead. */
 const HEADLIGHT_DIP = 0.05;
 const HEADLIGHT_COLOR: readonly [number, number, number] = [1.0, 0.94, 0.82];
-const HEADLIGHT_INTENSITY = 220;
-const HEADLIGHT_RANGE = 80;
+export const HEADLIGHT_INTENSITY = 220;
+export const HEADLIGHT_RANGE = 80;
 /** Half-angles, radians: a tight core that throws far, with a softer spill. */
 const HEADLIGHT_INNER = 0.15;
 const HEADLIGHT_OUTER = 0.4;
