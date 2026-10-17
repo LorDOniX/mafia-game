@@ -7,6 +7,8 @@ import { FirstPersonController } from '@/core/controller';
 import { generateCity } from '@/city/layout';
 import { CityCollision } from '@/city/collision';
 import {
+  ANIMALS,
+  ANIMALS_PER_PARK,
   CUSTOM_FACADES,
   loadCityAssets,
   loadOptionalModel,
@@ -26,6 +28,7 @@ import { createRng } from '@/core/rng';
 import { PARKED, Vehicle } from '@/vehicle/vehicle';
 import { fitVehicle, headlight, vehiclePose, vehicleTransform } from '@/vehicle/model';
 import { randomLoop, RouteDriver } from '@/vehicle/traffic';
+import { Animal, fitAnimal } from '@/animals/animal';
 import { Minimap, type MapCar } from '@/ui/minimap';
 import { bakeInstances } from '@/gfx/batch';
 import { MAX_LIGHTS, nearestLights } from '@/gfx/lights';
@@ -85,11 +88,12 @@ async function main(): Promise<void> {
   const defaultPrompt = prompt.textContent ?? 'Click to enter the city';
   prompt.textContent = 'Building Lost Heaven\u2026';
   const species = Object.keys(TREE_MODELS) as TreeSpecies[];
-  const [assets, carModel, policeModel, treeModels] = await Promise.all([
+  const [assets, carModel, policeModel, treeModels, animalModels] = await Promise.all([
     loadCityAssets(),
     loadOptionalModel(VEHICLE.url),
     loadOptionalModel(POLICE.url),
     Promise.all(species.map((s) => loadOptionalModel(TREE_MODELS[s].url))),
+    Promise.all(ANIMALS.map((a) => loadOptionalModel(a.url))),
   ]);
   prompt.textContent = defaultPrompt;
 
@@ -121,6 +125,28 @@ async function main(): Promise<void> {
     transform: identity(),
   };
   const lampLights = layout.lamps.map((spot) => lampLight(spot, kerb));
+
+  // A random handful of animals in every park, different each visit.
+  const animalRng = createRng((Math.random() * 2 ** 32) >>> 0);
+  const breeds = ANIMALS.flatMap((species, i) => {
+    const loaded = animalModels[i];
+    return loaded
+      ? [{ species, model: renderer.createModel(loaded), fit: fitAnimal(loaded.data, species.height) }]
+      : [];
+  });
+  const animals = breeds.length
+    ? layout.blocks
+        .filter((block) => block.isPark)
+        .flatMap((park) =>
+          Array.from({ length: animalRng.int(ANIMALS_PER_PARK.min, ANIMALS_PER_PARK.max) }, () => {
+            const breed = animalRng.pick(breeds);
+            return {
+              breed,
+              animal: new Animal(breed.species, park.plot, kerb, animalRng, collision),
+            };
+          }),
+        )
+    : [];
 
   let night = false;
   const setNight = (value: boolean): void => {
@@ -212,6 +238,7 @@ async function main(): Promise<void> {
     else controller.update(dt);
 
     for (const patrol of patrols) patrol.update(dt, collision);
+    for (const { animal } of animals) animal.update(dt, animalRng, collision);
   };
 
   startLoop(({ dt }) => {
@@ -224,6 +251,13 @@ async function main(): Promise<void> {
     if (input.wasPressed('KeyN')) setNight(!night);
 
     const instances: ModelInstance[] = [...trees, lamps];
+    for (const { breed, animal } of animals) {
+      instances.push({
+        model: breed.model,
+        transform: animal.transform(breed.fit),
+        pose: animal.pose(),
+      });
+    }
     if (car && vehicle) {
       instances.push({
         model: car.model,

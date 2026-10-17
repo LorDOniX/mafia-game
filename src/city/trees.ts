@@ -1,5 +1,5 @@
-import type { ModelData } from '@/gfx/gltf';
-import { multiply, rotationY, scaling, transformPoint, translate, type Mat4 } from '@/math/mat4';
+import { verticalExtent, type ModelData } from '@/gfx/gltf';
+import { multiply, rotationY, scaling, translate, type Mat4 } from '@/math/mat4';
 import type { TreeSpot } from './layout';
 
 /** Which species stands at a spot, from the street or park list as its kind says. */
@@ -17,16 +17,7 @@ export function treeTransform(
   height: number,
   groundY: number,
 ): Mat4 {
-  let minY = Infinity;
-  let maxY = -Infinity;
-  for (const part of model.parts) {
-    for (const y of [part.min.y, part.max.y]) {
-      const p = transformPoint(part.matrix, { x: part.min.x, y, z: part.min.z });
-      minY = Math.min(minY, p.y);
-      maxY = Math.max(maxY, p.y);
-    }
-  }
-
+  const { minY, maxY } = verticalExtent(model);
   const scale = (height * spot.size) / Math.max(maxY - minY, 1e-6);
   const placed = multiply(translate(spot.x, groundY, spot.z), rotationY(spot.rotation));
   return multiply(multiply(placed, scaling(scale)), translate(0, -minY, 0));

@@ -137,6 +137,18 @@ export function rotationY(angle: number, out: Mat4 = identity()): Mat4 {
   return out;
 }
 
+/** Rotation about +Z. Positive angles turn +X toward +Y. */
+export function rotationZ(angle: number, out: Mat4 = identity()): Mat4 {
+  const c = Math.cos(angle);
+  const s = Math.sin(angle);
+  identity(out);
+  out[0] = c;
+  out[1] = s;
+  out[4] = -s;
+  out[5] = c;
+  return out;
+}
+
 /**
  * Translation * rotation * scale, the order glTF composes a node's TRS in.
  * `rotation` is a unit quaternion as [x, y, z, w].

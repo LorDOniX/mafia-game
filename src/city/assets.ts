@@ -17,6 +17,7 @@ import {
 import { loadImageBitmap, rasterise, readPixels } from '@/gfx/image';
 import { loadModel, type LoadedModel } from '@/gfx/gltf';
 import type { VehicleModelConfig } from '@/vehicle/model';
+import type { AnimalSpecies } from '@/animals/animal';
 import { normalize, type Vec3 } from '@/math/vec3';
 
 /**
@@ -158,6 +159,40 @@ export type TreeSpecies = keyof typeof TREE_MODELS;
 export const STREET_TREES: readonly TreeSpecies[] = ['oak'];
 /** Parks, mixed tree by tree; repeat an entry to make it more common. */
 export const PARK_TREES: readonly TreeSpecies[] = ['oak', 'oak', 'pine', 'smallPine'];
+
+/**
+ * Park animals: Kenney "Cube Pets" (CC0), standing `height` metres tall.
+ * Flyers circle above the park; everything else wanders the lawn.
+ * The fish is in the kit too, but left out: it would only flop about.
+ */
+export const ANIMALS: readonly AnimalSpecies[] = [
+  { url: '/models-animals/animal-beaver.glb', height: 0.6 },
+  { url: '/models-animals/animal-bee.glb', height: 0.6, flies: true },
+  { url: '/models-animals/animal-bunny.glb', height: 0.6 },
+  { url: '/models-animals/animal-cat.glb', height: 0.6 },
+  { url: '/models-animals/animal-caterpillar.glb', height: 0.4 },
+  { url: '/models-animals/animal-chick.glb', height: 0.45 },
+  { url: '/models-animals/animal-cow.glb', height: 1.6 },
+  { url: '/models-animals/animal-crab.glb', height: 0.4 },
+  { url: '/models-animals/animal-deer.glb', height: 1.6 },
+  { url: '/models-animals/animal-dog.glb', height: 0.8 },
+  { url: '/models-animals/animal-elephant.glb', height: 3 },
+  { url: '/models-animals/animal-fox.glb', height: 0.7 },
+  { url: '/models-animals/animal-giraffe.glb', height: 4.5 },
+  { url: '/models-animals/animal-hog.glb', height: 1 },
+  { url: '/models-animals/animal-koala.glb', height: 0.7 },
+  { url: '/models-animals/animal-lion.glb', height: 1.3 },
+  { url: '/models-animals/animal-monkey.glb', height: 0.9 },
+  { url: '/models-animals/animal-panda.glb', height: 1.4 },
+  { url: '/models-animals/animal-parrot.glb', height: 0.7, flies: true },
+  { url: '/models-animals/animal-penguin.glb', height: 0.9 },
+  { url: '/models-animals/animal-pig.glb', height: 1 },
+  { url: '/models-animals/animal-polar.glb', height: 1.6 },
+  { url: '/models-animals/animal-tiger.glb', height: 1.2 },
+];
+
+/** How many animals each park gets, inclusive. */
+export const ANIMALS_PER_PARK = { min: 3, max: 7 };
 
 /** A model, or null if it fails to load: the city still works without it. */
 export async function loadOptionalModel(url: string): Promise<LoadedModel | null> {

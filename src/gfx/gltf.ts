@@ -1,4 +1,4 @@
-import { fromTRS, identity, multiply, type Mat4 } from '@/math/mat4';
+import { fromTRS, identity, multiply, transformPoint, type Mat4 } from '@/math/mat4';
 import type { Vec3 } from '@/math/vec3';
 import { loadImageBitmap } from './image';
 
@@ -53,6 +53,20 @@ export interface LoadedModel {
   data: ModelData;
   /** Null when the model has no texture or it failed to load. */
   image: ImageBitmap | null;
+}
+
+/** Lowest and highest point of a model at rest, in model space. */
+export function verticalExtent(model: ModelData): { minY: number; maxY: number } {
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (const part of model.parts) {
+    for (const y of [part.min.y, part.max.y]) {
+      const p = transformPoint(part.matrix, { x: part.min.x, y, z: part.min.z });
+      minY = Math.min(minY, p.y);
+      maxY = Math.max(maxY, p.y);
+    }
+  }
+  return { minY, maxY };
 }
 
 export async function loadModel(url: string): Promise<LoadedModel> {
