@@ -148,10 +148,19 @@
         display: none;
       }
 
+      #clock {
+        position: fixed;
+        top: 12px;
+        right: 12px;
+        width: 170px;
+        height: 170px;
+        pointer-events: none;
+      }
+
       #daynight {
         position: fixed;
-        top: 16px;
-        right: 16px;
+        top: 190px;
+        right: 22px;
         z-index: 1;
         padding: 0.45rem 0.9rem;
         font: inherit;
@@ -174,7 +183,8 @@
     <div id="crosshair" hidden></div>
     <div id="hud"></div>
     <canvas id="minimap"></canvas>
-    <button id="daynight" type="button">Switch to night (N)</button>
+    <canvas id="clock"></canvas>
+    <button id="daynight" type="button">Skip to evening (N)</button>
     <canvas id="speedometer" hidden></canvas>
 
     <div id="overlay">
@@ -196,7 +206,7 @@
         <dt>E</dt>
         <dd>get in / out of the car</dd>
         <dt>N</dt>
-        <dd>day / night</dd>
+        <dd>skip to evening / morning</dd>
         <dt>T</dt>
         <dd>flashlight</dd>
         <dt>Space</dt>

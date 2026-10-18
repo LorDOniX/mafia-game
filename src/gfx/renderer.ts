@@ -24,22 +24,28 @@ const AMBIENT: [number, number, number] = [0.42, 0.46, 0.54];
 const FOG_DENSITY = 0.0016;
 
 /** No sun, and barely any sky light: after dark the lamps and headlights do the work. */
-const NIGHT_SUN: [number, number, number] = [0, 0, 0];
 const NIGHT_AMBIENT: [number, number, number] = [0.015, 0.018, 0.028];
 /** Thicker than by day, so unlit streets sink into the dark. */
 const NIGHT_FOG_DENSITY = 0.006;
+/** Low warm light at sunrise and sunset: tints the sun and glows on the horizon. */
+const DUSK_SUN: [number, number, number] = [1.0, 0.55, 0.3];
+const DUSK_GLOW: [number, number, number] = [0.45, 0.2, 0.08];
 
 export interface RenderStats {
   triangles: number;
 }
 
+/** The time of day, as `daylightAt` gives it, and the lights to shade with. */
 export interface SceneState {
-  night: boolean;
-  /** Already narrowed to what the shaders can take; see `nearestLights`. Lit by day too. */
+  daylight: number;
+  dusk: number;
+  /** How far up lamp glass glows. */
+  lightsOn: number;
+  /** Already narrowed to what the shaders can take; see `nearestLights`. */
   lights: readonly SpotLight[];
 }
 
-const DAYTIME: SceneState = { night: false, lights: [] };
+const NOON: SceneState = { daylight: 1, dusk: 0, lightsOn: 0, lights: [] };
 
 export class Renderer {
   private readonly gl: WebGL2RenderingContext;
@@ -48,7 +54,6 @@ export class Renderer {
   private readonly atlas: WebGLTexture;
   private readonly normals: WebGLTexture;
   private readonly skybox: Skybox;
-  private readonly nightSkybox: Skybox;
   private readonly models: ModelPass;
   private readonly sky: CityAssets['sky'];
   private readonly lights = new LightBuffer();
@@ -79,8 +84,7 @@ export class Renderer {
     ]);
     this.stats = { triangles: data.indices.length / 3 };
 
-    this.skybox = new Skybox(gl, assets.sky.faces);
-    this.nightSkybox = new Skybox(gl, createNightSkyFaces());
+    this.skybox = new Skybox(gl, assets.sky.faces, createNightSkyFaces());
     this.models = new ModelPass(gl);
 
     gl.enable(gl.DEPTH_TEST);
@@ -93,11 +97,7 @@ export class Renderer {
     return this.models.createModel(loaded);
   }
 
-  render(
-    camera: Camera,
-    instances: readonly ModelInstance[] = [],
-    scene: SceneState = DAYTIME,
-  ): void {
+  render(camera: Camera, instances: readonly ModelInstance[] = [], scene: SceneState = NOON): void {
     const { gl } = this;
 
     if (this.ctx.resize()) {
@@ -105,11 +105,16 @@ export class Renderer {
     }
     camera.update();
 
-    const { night } = scene;
-    const sunColor = night ? NIGHT_SUN : SUN_COLOR;
-    const ambient = night ? NIGHT_AMBIENT : AMBIENT;
-    const fogColor = night ? NIGHT_HORIZON_COLOR : this.sky.horizonColor;
-    const fogDensity = night ? NIGHT_FOG_DENSITY : FOG_DENSITY;
+    const { daylight, dusk } = scene;
+    // The sun reddens and fades as it sets; sky light and haze follow it down.
+    const sunColor = mixRGB(SUN_COLOR, DUSK_SUN, dusk).map((c) => c * daylight) as RGB;
+    const ambient = mixRGB(NIGHT_AMBIENT, AMBIENT, daylight);
+    const glow = DUSK_GLOW.map((c) => c * dusk) as RGB;
+    // Fog meets the sky at the horizon, so it carries the same glow.
+    const fogColor = mixRGB(NIGHT_HORIZON_COLOR, this.sky.horizonColor, daylight).map(
+      (c, i) => c + (glow[i] ?? 0),
+    ) as RGB;
+    const fogDensity = NIGHT_FOG_DENSITY + (FOG_DENSITY - NIGHT_FOG_DENSITY) * daylight;
     this.lights.set(scene.lights);
 
     gl.clearColor(fogColor[0], fogColor[1], fogColor[2], 1);
@@ -149,10 +154,18 @@ export class Renderer {
       fogColor,
       fogDensity,
       lights: this.lights,
-      emissiveScale: night ? 1 : 0,
+      emissiveScale: scene.lightsOn,
     };
     this.models.render(camera.viewProjection, lighting, instances);
 
-    (night ? this.nightSkybox : this.skybox).render(camera.view, camera.projection);
+    this.skybox.render(camera.view, camera.projection, 1 - daylight, glow);
   }
 }
+
+type RGB = [number, number, number];
+
+const mixRGB = (a: readonly number[], b: readonly number[], t: number): RGB => [
+  (a[0] ?? 0) + ((b[0] ?? 0) - (a[0] ?? 0)) * t,
+  (a[1] ?? 0) + ((b[1] ?? 0) - (a[1] ?? 0)) * t,
+  (a[2] ?? 0) + ((b[2] ?? 0) - (a[2] ?? 0)) * t,
+];

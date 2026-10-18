@@ -19,16 +19,19 @@ const CUBE_INDICES = new Uint32Array([
 export class Skybox {
   private readonly program: Program;
   private readonly mesh: Mesh;
-  private readonly texture: WebGLTexture;
+  private readonly day: WebGLTexture;
+  private readonly night: WebGLTexture;
   private readonly viewNoTranslate: Mat4 = new Float32Array(16);
   private readonly viewProj: Mat4 = new Float32Array(16);
 
   constructor(
     private readonly gl: WebGL2RenderingContext,
-    faces: ImageData[],
+    dayFaces: ImageData[],
+    nightFaces: ImageData[],
   ) {
     this.program = createProgram(gl, vertexSource, fragmentSource);
-    this.texture = createCubeMap(gl, faces, SKY_FACE_SIZE);
+    this.day = createCubeMap(gl, dayFaces, SKY_FACE_SIZE);
+    this.night = createCubeMap(gl, nightFaces, SKY_FACE_SIZE);
     this.mesh = createMesh(gl, CUBE_VERTICES, CUBE_INDICES, this.program.attributes, [
       { name: 'a_position', size: 3 },
     ]);
@@ -37,8 +40,15 @@ export class Skybox {
   /**
    * Draw last, after opaque geometry: the depth test then rejects every sky
    * fragment the city already covers instead of shading it twice.
+   *
+   * `night` crossfades to the night sky; `glow` is added low on the horizon.
    */
-  render(view: Mat4, projection: Mat4): void {
+  render(
+    view: Mat4,
+    projection: Mat4,
+    night: number,
+    glow: readonly [number, number, number],
+  ): void {
     const { gl } = this;
 
     // Dropping the translation column pins the cube to the camera, so the sky
@@ -52,14 +62,19 @@ export class Skybox {
 
     gl.useProgram(this.program.program);
 
-    const mvp = this.program.uniforms['u_viewProjNoTranslate'];
-    if (mvp) gl.uniformMatrix4fv(mvp, false, this.viewProj);
-
-    const sampler = this.program.uniforms['u_sky'];
-    if (sampler) gl.uniform1i(sampler, 0);
+    const u = this.program.uniforms;
+    if (u['u_viewProjNoTranslate'])
+      gl.uniformMatrix4fv(u['u_viewProjNoTranslate'], false, this.viewProj);
+    if (u['u_sky']) gl.uniform1i(u['u_sky'], 0);
+    if (u['u_nightSky']) gl.uniform1i(u['u_nightSky'], 1);
+    if (u['u_night']) gl.uniform1f(u['u_night'], night);
+    if (u['u_glow']) gl.uniform3fv(u['u_glow'], glow);
 
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_CUBE_MAP, this.texture);
+    gl.bindTexture(gl.TEXTURE_CUBE_MAP, this.day);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_CUBE_MAP, this.night);
+    gl.activeTexture(gl.TEXTURE0);
 
     this.mesh.draw();
 

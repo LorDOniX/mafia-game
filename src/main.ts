@@ -33,6 +33,8 @@ import type { Obstacle } from '@/city/collision';
 import { Animal, fitAnimal } from '@/animals/animal';
 import { Minimap, type MapCar } from '@/ui/minimap';
 import { Speedometer } from '@/ui/speedometer';
+import { ClockDial } from '@/ui/clock';
+import { daylightAt, GameClock } from '@/game/clock';
 import { bakeInstances } from '@/gfx/batch';
 import { MAX_LIGHTS, nearestLights, type SpotLight } from '@/gfx/lights';
 import { flashlight } from '@/core/flashlight';
@@ -55,6 +57,7 @@ async function main(): Promise<void> {
   const minimapCanvas = document.querySelector<HTMLCanvasElement>('#minimap');
   const speedometerCanvas = document.querySelector<HTMLCanvasElement>('#speedometer');
   const dayNight = document.querySelector<HTMLButtonElement>('#daynight');
+  const clockCanvas = document.querySelector<HTMLCanvasElement>('#clock');
 
   if (
     !canvas ||
@@ -64,7 +67,8 @@ async function main(): Promise<void> {
     !hud ||
     !minimapCanvas ||
     !speedometerCanvas ||
-    !dayNight
+    !dayNight ||
+    !clockCanvas
   ) {
     throw new Error('Missing required DOM nodes');
   }
@@ -157,17 +161,16 @@ async function main(): Promise<void> {
         )
     : [];
 
-  let night = false;
-  const setNight = (value: boolean): void => {
-    night = value;
-    dayNight.textContent = night ? 'Switch to day (N)' : 'Switch to night (N)';
-  };
-  setNight(false);
+  // Time runs while playing; N or the button skips ahead to evening or morning.
+  const clock = new GameClock();
+  const isDay = (): boolean => daylightAt(clock.hour).daylight > 0.5;
+  const skipTime = (): void => clock.skipTo(isDay() ? 21 : 7);
   dayNight.addEventListener('click', (event) => {
     // The document-wide click would otherwise grab the mouse.
     event.stopPropagation();
-    setNight(!night);
+    skipTime();
   });
+  const clockDial = new ClockDial(clockCanvas);
 
   // Parked just past the spawn crossroads, in the right-hand lane of the
   // avenue the player starts out looking down.
@@ -205,7 +208,9 @@ async function main(): Promise<void> {
     const loaded = trafficModels[i];
     if (!loaded) return [];
     const config = trafficVehicleConfig(entry);
-    return [{ entry, config, fit: fitVehicle(loaded.data, config), model: renderer.createModel(loaded) }];
+    return [
+      { entry, config, fit: fitVehicle(loaded.data, config), model: renderer.createModel(loaded) },
+    ];
   });
   const traffic = new Traffic(buildRoadNetwork(layout));
   const kindOf = new Map<TrafficCar, (typeof fleet)[number]>();
@@ -248,19 +253,28 @@ async function main(): Promise<void> {
   let fps = 0;
 
   let flashlightOn = false;
-  /** The flashlight first, then headlights of traffic and the driven car, then the nearest lamps. */
-  const sceneLights = (): SpotLight[] => {
+  /**
+   * The flashlight first, then headlights of traffic and the driven car, then
+   * the nearest lamps, the last two dimmed as the lights come up at dusk.
+   */
+  const sceneLights = (level: number): SpotLight[] => {
     const own = flashlightOn ? [flashlight(camera)] : [];
-    if (!night) return own;
+    if (level < 0.01) return own;
+    const dim = (light: SpotLight): SpotLight => ({
+      ...light,
+      color: [light.color[0] * level, light.color[1] * level, light.color[2] * level],
+    });
     const cars = traffic.cars.map((c) => c.vehicle);
     if (vehicle && driving) cars.push(vehicle);
     const beams = nearestLights(cars.map(headlight), camera.position, HEADLIGHT_SLOTS);
     const left = MAX_LIGHTS - own.length - beams.length;
-    return [...own, ...beams, ...nearestLights(lampLights, camera.position, left)];
+    const lamps = nearestLights(lampLights, camera.position, left);
+    return [...own, ...beams.map(dim), ...lamps.map(dim)];
   };
 
   let playTime = 0;
   const simulate = (dt: number): void => {
+    clock.advance(dt);
     // Traffic is solid; the player's own car is too, except to itself and its chase camera.
     collision.setObstacles([
       ...traffic.obstacles(),
@@ -300,7 +314,7 @@ async function main(): Promise<void> {
       playTime += dt;
       simulate(dt);
     }
-    if (input.wasPressed('KeyN')) setNight(!night);
+    if (input.wasPressed('KeyN')) skipTime();
     if (input.wasPressed('KeyT')) flashlightOn = !flashlightOn;
 
     const instances: ModelInstance[] = [...trees, lamps];
@@ -327,8 +341,18 @@ async function main(): Promise<void> {
         pose: vehiclePose(trafficCar.vehicle, kind.config),
       });
     }
-    renderer.render(camera, instances, { night, lights: sceneLights() });
+    const sun = daylightAt(clock.hour);
+    renderer.render(camera, instances, {
+      daylight: sun.daylight,
+      dusk: sun.dusk,
+      lightsOn: sun.lights,
+      lights: sceneLights(sun.lights),
+    });
     input.endFrame();
+
+    clockDial.draw(clock.hour, clock.label(), clock.day);
+    const skipLabel = isDay() ? 'Skip to evening (N)' : 'Skip to morning (N)';
+    if (dayNight.textContent !== skipLabel) dayNight.textContent = skipLabel;
 
     minimap.draw(
       {
@@ -338,9 +362,7 @@ async function main(): Promise<void> {
         fov: camera.horizontalFov(),
       },
       [
-        ...traffic.cars.map((c) =>
-          mapCar(c.vehicle, kindOf.get(c)?.entry.mapColor ?? '#cccccc'),
-        ),
+        ...traffic.cars.map((c) => mapCar(c.vehicle, kindOf.get(c)?.entry.mapColor ?? '#cccccc')),
         ...(vehicle ? [mapCar(vehicle, PLAYER_CAR_COLOR)] : []),
       ],
     );
