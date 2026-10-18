@@ -130,15 +130,46 @@ export const VEHICLE: VehicleModelConfig = {
   steerPrefix: 'wheel-front',
 };
 
-/** Police cars that patrol the streets on their own. Same kit, same wheel names. */
-export const POLICE: VehicleModelConfig = {
-  url: '/models/police.glb',
-  scale: 1.4,
-  spinPrefix: 'wheel-',
-  steerPrefix: 'wheel-front',
-};
+/** A car in city traffic, from the Kenney "Car Kit" in public/models-car/. */
+export interface TrafficCarModel {
+  url: string;
+  /** Relative odds of a car being this model. */
+  weight: number;
+  /** Its colour on the minimap. */
+  mapColor: string;
+}
 
-export const POLICE_COUNT = 5;
+const CAR_KIT = { scale: 1.4, spinPrefix: 'wheel-', steerPrefix: 'wheel-front' };
+
+/** Turns a traffic model into the config `fitVehicle` and `vehiclePose` take. */
+export const trafficVehicleConfig = (model: TrafficCarModel): VehicleModelConfig => ({
+  url: model.url,
+  ...CAR_KIT,
+});
+
+/**
+ * Everyday street traffic. Karts, racers and tractors stay in the kit; so does
+ * the SUV, whose spare wheel on the tailgate would spin with the rest.
+ */
+export const TRAFFIC_CARS: readonly TrafficCarModel[] = [
+  { url: '/models-car/sedan.glb', weight: 6, mapColor: '#d6d2c8' },
+  { url: '/models-car/sedan-sports.glb', weight: 2, mapColor: '#d6d2c8' },
+  { url: '/models-car/hatchback-sports.glb', weight: 2, mapColor: '#d6d2c8' },
+  { url: '/models-car/suv-luxury.glb', weight: 2, mapColor: '#d6d2c8' },
+  { url: '/models-car/taxi.glb', weight: 4, mapColor: '#e8c64a' },
+  { url: '/models-car/van.glb', weight: 2, mapColor: '#bfb8a8' },
+  { url: '/models-car/delivery.glb', weight: 1.5, mapColor: '#bfb8a8' },
+  { url: '/models-car/delivery-flat.glb', weight: 1, mapColor: '#bfb8a8' },
+  { url: '/models-car/truck.glb', weight: 1, mapColor: '#a9a294' },
+  { url: '/models-car/truck-flat.glb', weight: 1, mapColor: '#a9a294' },
+  { url: '/models-car/garbage-truck.glb', weight: 0.5, mapColor: '#8f9a6e' },
+  { url: '/models-car/police.glb', weight: 1, mapColor: '#3f7bff' },
+  { url: '/models-car/ambulance.glb', weight: 0.4, mapColor: '#f2f2f2' },
+  { url: '/models-car/firetruck.glb', weight: 0.3, mapColor: '#d8483a' },
+];
+
+/** Cars driving around town at once. */
+export const TRAFFIC_COUNT = 100;
 
 /**
  * Tree species: a model and the height it should stand, in metres. Width

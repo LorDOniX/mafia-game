@@ -5,6 +5,18 @@ const CELL_SIZE = 20;
 export const TRUNK_RADIUS = 0.3;
 export const LAMP_POST_RADIUS = 0.15;
 
+/** A box that moves: a car's footprint, in the vehicle heading convention. */
+export interface Obstacle {
+  x: number;
+  z: number;
+  /** 0 faces -Z, pi/2 faces +X. */
+  heading: number;
+  halfLength: number;
+  halfWidth: number;
+  /** Whatever the obstacle stands for, so a car can ignore its own box. */
+  owner?: unknown;
+}
+
 /**
  * Uniform grid over building footprints, tree trunks and lamp posts.
  *
@@ -16,6 +28,7 @@ export class CityCollision {
   private readonly cells = new Map<number, Rect[]>();
   private readonly columns: number;
   private readonly bounds: Rect;
+  private obstacles: readonly Obstacle[] = [];
 
   constructor(private readonly layout: CityLayout) {
     this.bounds = layout.bounds;
@@ -71,8 +84,8 @@ export class CityCollision {
     return found;
   }
 
-  /** True if a circle of `radius` at (x, z) overlaps any building. */
-  overlaps(x: number, z: number, radius: number): boolean {
+  /** True if a circle of `radius` at (x, z) overlaps a building, trunk, post or car. */
+  overlaps(x: number, z: number, radius: number, ignore?: unknown): boolean {
     for (const rect of this.candidates(x, z, radius)) {
       const nearestX = Math.min(Math.max(x, rect.minX), rect.maxX);
       const nearestZ = Math.min(Math.max(z, rect.minZ), rect.maxZ);
@@ -80,18 +93,27 @@ export class CityCollision {
       const dz = z - nearestZ;
       if (dx * dx + dz * dz < radius * radius) return true;
     }
-    return false;
+    return this.obstacles.some((o) => o.owner !== ignore && circleHitsObstacle(x, z, radius, o));
   }
 
-  /** True if a circle at (x, z) overlaps a building or reaches past the map edge. */
-  blocked(x: number, z: number, radius: number): boolean {
+  /**
+   * Things that move, replaced every frame: cars, so the player bumps into
+   * traffic and traffic is solid underfoot. `ignore` in the queries skips the
+   * asker's own entry.
+   */
+  setObstacles(obstacles: readonly Obstacle[]): void {
+    this.obstacles = obstacles;
+  }
+
+  /** True if a circle at (x, z) overlaps something solid or reaches past the map edge. */
+  blocked(x: number, z: number, radius: number, ignore?: unknown): boolean {
     const { bounds } = this;
     return (
       x - radius < bounds.minX ||
       x + radius > bounds.maxX ||
       z - radius < bounds.minZ ||
       z + radius > bounds.maxZ ||
-      this.overlaps(x, z, radius)
+      this.overlaps(x, z, radius, ignore)
     );
   }
 
@@ -137,3 +159,17 @@ export class CityCollision {
 
 const clamp = (value: number, min: number, max: number): number =>
   Math.min(Math.max(value, min), max);
+
+/** True if a circle at (x, z) overlaps an obstacle's footprint. */
+export function circleHitsObstacle(x: number, z: number, radius: number, o: Obstacle): boolean {
+  const dx = x - o.x;
+  const dz = z - o.z;
+  const reach = Math.max(o.halfLength, o.halfWidth) + radius;
+  if (dx * dx + dz * dz > reach * reach) return false;
+
+  const along = dx * Math.sin(o.heading) - dz * Math.cos(o.heading);
+  const across = dx * Math.cos(o.heading) + dz * Math.sin(o.heading);
+  const ax = along - clamp(along, -o.halfLength, o.halfLength);
+  const az = across - clamp(across, -o.halfWidth, o.halfWidth);
+  return ax * ax + az * az < radius * radius;
+}

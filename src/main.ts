@@ -13,9 +13,10 @@ import {
   loadCityAssets,
   loadOptionalModel,
   PARK_TREES,
-  POLICE,
-  POLICE_COUNT,
   STREET_TREES,
+  TRAFFIC_CARS,
+  TRAFFIC_COUNT,
+  trafficVehicleConfig,
   TREE_MODELS,
   VEHICLE,
   type TreeSpecies,
@@ -25,9 +26,10 @@ import { speciesAt, treeTransform } from '@/city/trees';
 import { createLampModel, lampLight, lampTransform } from '@/city/lamp';
 import { DriveController } from '@/core/drive';
 import { createRng } from '@/core/rng';
-import { PARKED, Vehicle } from '@/vehicle/vehicle';
+import { PARKED, Vehicle, type VehicleWorld } from '@/vehicle/vehicle';
 import { fitVehicle, headlight, vehiclePose, vehicleTransform } from '@/vehicle/model';
-import { randomLoop, RouteDriver } from '@/vehicle/traffic';
+import { buildRoadNetwork, Traffic, type TrafficCar } from '@/vehicle/traffic';
+import type { Obstacle } from '@/city/collision';
 import { Animal, fitAnimal } from '@/animals/animal';
 import { Minimap, type MapCar } from '@/ui/minimap';
 import { bakeInstances } from '@/gfx/batch';
@@ -38,9 +40,10 @@ import { identity } from '@/math/mat4';
 
 const HUD_INTERVAL = 0.25;
 const PLAYER_CAR_COLOR = '#e0b84a';
-const POLICE_COLOR = '#3f7bff';
 /** Shader light slots kept for headlights; street lamps get the rest. */
 const HEADLIGHT_SLOTS = 8;
+/** Room the player takes up on foot, for traffic to stop short of. */
+const PEDESTRIAN_RADIUS = 0.4;
 
 async function main(): Promise<void> {
   const canvas = document.querySelector<HTMLCanvasElement>('#gl');
@@ -89,10 +92,10 @@ async function main(): Promise<void> {
   const defaultPrompt = prompt.textContent ?? 'Click to enter the city';
   prompt.textContent = 'Building Lost Heaven\u2026';
   const species = Object.keys(TREE_MODELS) as TreeSpecies[];
-  const [assets, carModel, policeModel, treeModels, animalModels] = await Promise.all([
+  const [assets, carModel, trafficModels, treeModels, animalModels] = await Promise.all([
     loadCityAssets(),
     loadOptionalModel(VEHICLE.url),
-    loadOptionalModel(POLICE.url),
+    Promise.all(TRAFFIC_CARS.map((c) => loadOptionalModel(c.url))),
     Promise.all(species.map((s) => loadOptionalModel(TREE_MODELS[s].url))),
     Promise.all(ANIMALS.map((a) => loadOptionalModel(a.url))),
   ]);
@@ -174,20 +177,50 @@ async function main(): Promise<void> {
     model: renderer.createModel(carModel),
   };
   const vehicle = car && new Vehicle(car.fit.body, spawn - 2, spawn + 20, Math.PI);
-
-  // Each patrol car gets its own random loop and starting point on it.
-  const police = policeModel && {
-    fit: fitVehicle(policeModel.data, POLICE),
-    model: renderer.createModel(policeModel),
+  // The player's car drives through the same world as everything else, minus itself.
+  const playerWorld: VehicleWorld = {
+    blocked: (x, z, r) => collision.blocked(x, z, r, vehicle),
+    groundHeightAt: (x, z) => collision.groundHeightAt(x, z),
   };
+  const carObstacle = (v: Vehicle, owner: unknown): Obstacle => ({
+    x: v.x,
+    z: v.z,
+    heading: v.heading,
+    halfLength: v.body.length / 2,
+    halfWidth: v.body.width / 2,
+    owner,
+  });
+  /** What traffic has to stop for besides itself: the player's car, and the player on foot. */
+  const playerObstacles = (): Obstacle[] => {
+    const list = vehicle ? [carObstacle(vehicle, vehicle)] : [];
+    if (!driving) {
+      const { x, z } = camera.position;
+      list.push({ x, z, heading: 0, halfLength: PEDESTRIAN_RADIUS, halfWidth: PEDESTRIAN_RADIUS });
+    }
+    return list;
+  };
+
+  // A town's worth of traffic, models picked by their weights.
   const trafficRng = createRng((Math.random() * 2 ** 32) >>> 0);
-  const patrols = police
-    ? Array.from({ length: POLICE_COUNT }, () =>
-        RouteDriver.spawn(police.fit.body, randomLoop(layout, trafficRng), trafficRng),
-      )
-    : [];
-  const drive = new DriveController(camera, input, collision);
+  const fleet = TRAFFIC_CARS.flatMap((entry, i) => {
+    const loaded = trafficModels[i];
+    if (!loaded) return [];
+    const config = trafficVehicleConfig(entry);
+    return [{ entry, config, fit: fitVehicle(loaded.data, config), model: renderer.createModel(loaded) }];
+  });
+  const traffic = new Traffic(buildRoadNetwork(layout));
+  const kindOf = new Map<TrafficCar, (typeof fleet)[number]>();
+  const totalWeight = fleet.reduce((sum, kind) => sum + kind.entry.weight, 0);
   let driving = false;
+  for (let n = 0; n < TRAFFIC_COUNT && fleet.length; n++) {
+    let pick = trafficRng.range(0, totalWeight);
+    const kind = fleet.find((k) => (pick -= k.entry.weight) <= 0) ?? fleet[0];
+    if (!kind) break;
+    const spawned = traffic.spawn(kind.fit.body, trafficRng, playerObstacles());
+    if (spawned) kindOf.set(spawned, kind);
+  }
+
+  const drive = new DriveController(camera, input, collision);
   const minimap = new Minimap(minimapCanvas, layout);
   const mapCar = (v: Vehicle, color: string): MapCar => ({
     x: v.x,
@@ -218,7 +251,7 @@ async function main(): Promise<void> {
   const sceneLights = (): SpotLight[] => {
     const own = flashlightOn ? [flashlight(camera)] : [];
     if (!night) return own;
-    const cars = patrols.map((p) => p.vehicle);
+    const cars = traffic.cars.map((c) => c.vehicle);
     if (vehicle && driving) cars.push(vehicle);
     const beams = nearestLights(cars.map(headlight), camera.position, HEADLIGHT_SLOTS);
     const left = MAX_LIGHTS - own.length - beams.length;
@@ -227,6 +260,12 @@ async function main(): Promise<void> {
 
   let playTime = 0;
   const simulate = (dt: number): void => {
+    // Traffic is solid; the player's own car is too, except to itself and its chase camera.
+    collision.setObstacles([
+      ...traffic.obstacles(),
+      ...(vehicle && !driving ? [carObstacle(vehicle, vehicle)] : []),
+    ]);
+
     if (vehicle && input.wasPressed('KeyE')) {
       if (driving) {
         const exit = drive.exitPoint(vehicle);
@@ -244,11 +283,11 @@ async function main(): Promise<void> {
     }
 
     // The car keeps simulating when empty, so one left rolling coasts to a stop.
-    vehicle?.update(dt, driving ? drive.controls() : PARKED, collision);
+    vehicle?.update(dt, driving ? drive.controls() : PARKED, playerWorld);
     if (vehicle && driving) drive.updateCamera(dt, vehicle);
     else controller.update(dt);
 
-    for (const patrol of patrols) patrol.update(dt, collision);
+    traffic.update(dt, playerObstacles(), trafficRng);
     for (const { animal } of animals) animal.update(dt, animalRng, collision);
   };
 
@@ -277,14 +316,14 @@ async function main(): Promise<void> {
         pose: vehiclePose(vehicle, VEHICLE),
       });
     }
-    if (police) {
-      for (const { vehicle: patrol } of patrols) {
-        instances.push({
-          model: police.model,
-          transform: vehicleTransform(patrol, police.fit),
-          pose: vehiclePose(patrol, POLICE),
-        });
-      }
+    for (const trafficCar of traffic.cars) {
+      const kind = kindOf.get(trafficCar);
+      if (!kind) continue;
+      instances.push({
+        model: kind.model,
+        transform: vehicleTransform(trafficCar.vehicle, kind.fit),
+        pose: vehiclePose(trafficCar.vehicle, kind.config),
+      });
     }
     renderer.render(camera, instances, { night, lights: sceneLights() });
     input.endFrame();
@@ -297,7 +336,9 @@ async function main(): Promise<void> {
         fov: camera.horizontalFov(),
       },
       [
-        ...patrols.map((p) => mapCar(p.vehicle, POLICE_COLOR)),
+        ...traffic.cars.map((c) =>
+          mapCar(c.vehicle, kindOf.get(c)?.entry.mapColor ?? '#cccccc'),
+        ),
         ...(vehicle ? [mapCar(vehicle, PLAYER_CAR_COLOR)] : []),
       ],
     );

@@ -1,5 +1,4 @@
-- přidání přepnutí do weboky den/noc
-- rozmístnit lampy po mapě - kdyžtak zase pořešíme modely + textury
-- jestli jiný skybox? bude tma
-- osvětlovat celou scénu pouze lampami, dopad světla přes kužel
-- auta budou svítit před sebe
+- předěláme systém aut
+- po vzoru zvířat je složka modelů models-car
+- teďka je 5 policejních aut myslím, to zruš
+- celkově budou na ulicích více aut, zkusíme třeba 100 (náhodné, co dávají smysl), auta budou moct jezdit za sebou, mají kolize mezi sebou a s námi taky

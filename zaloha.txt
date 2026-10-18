@@ -9,5 +9,6 @@ skybox - hotogo
 smysl hry?
 pauznutí hry, kolize
 https://kenney.nl/assets/cube-pets - zvířata do parku
+střídání dne a noci
 
 vlaky - 2d izometrická https://kenney.nl/assets/train-kit
