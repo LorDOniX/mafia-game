@@ -24,7 +24,7 @@ export function normalize(a: Vec3): Vec3 {
   return len === 0 ? vec3() : scale(a, 1 / len);
 }
 
-/** a + b * s — the workhorse for integrating movement. */
+/** a + b * s — tahoun pro integraci pohybu. */
 export const addScaled = (a: Vec3, b: Vec3, s: number): Vec3 => ({
   x: a.x + b.x * s,
   y: a.y + b.y * s,

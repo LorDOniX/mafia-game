@@ -2,22 +2,22 @@ import { verticalExtent, type ModelData } from '@/gfx/gltf';
 import { multiply, rotationX, rotationY, scaling, translate, type Mat4 } from '@/math/mat4';
 import type { Vec3 } from '@/math/vec3';
 
-/** Everyone stands this tall, metres. */
+/** Takovou výšku má každý, metry. */
 export const CHARACTER_HEIGHT = 1.8;
-/** Where a body can be hit: a sphere for the head, an upright cylinder for the rest. */
+/** Kde lze tělo zasáhnout: koule pro hlavu, svislý válec pro zbytek. */
 export const HEAD_HEIGHT = 1.55;
 export const HEAD_RADIUS = 0.27;
 export const BODY_RADIUS = 0.33;
 export const BODY_TOP = 1.3;
-/** Eye height, for lines of sight. */
+/** Výška očí, pro přímé viditelnosti. */
 export const EYE_HEIGHT = 1.6;
 
 const LEG_SWING = 0.7;
 const ARM_SWING = 0.55;
-/** Seconds to topple once dead. */
+/** Sekundy, za které se mrtvý skácí. */
 const FALL_TIME = 0.6;
 
-/** How a Kenney "Blocky Characters" model is sized and stood on the ground. */
+/** Jak se model Kenney "Blocky Characters" zmenší/zvětší a postaví na zem. */
 export interface BodyFit {
   scale: number;
   lift: number;
@@ -34,10 +34,10 @@ export interface RayHit {
 }
 
 /**
- * A person's place and pose: walking swings the legs and arms, aiming raises
- * the right arm straight ahead, and dying topples them over backwards.
+ * Poloha a póza postavy: chůze kývá nohama a rukama, míření zvedne pravou ruku
+ * přímo vpřed a smrt postavu převrátí na záda.
  *
- * `heading` follows `rotationY`: the model's +Z faces (sin, cos) of it.
+ * `heading` se řídí podle `rotationY`: +Z modelu míří na (sin, cos) této hodnoty.
  */
 export class Body {
   x = 0;
@@ -45,9 +45,9 @@ export class Body {
   z = 0;
   heading = 0;
   walking = false;
-  /** 0 arm down, 1 arm raised at the target. */
+  /** 0 ruka dole, 1 ruka zvednutá na cíl. */
   aim = 0;
-  /** Seconds since death; negative while alive. */
+  /** Sekundy od smrti; za života záporné. */
   deadFor = -1;
   private stride = 0;
 
@@ -55,7 +55,7 @@ export class Body {
     return this.deadFor < 0;
   }
 
-  /** Forward on the ground, unit length. */
+  /** Směr vpřed po zemi, jednotková délka. */
   forward(): { x: number; z: number } {
     return { x: Math.sin(this.heading), z: Math.cos(this.heading) };
   }
@@ -79,7 +79,7 @@ export class Body {
     return multiply(multiply(toppled, scaling(fit.scale)), translate(0, fit.lift, 0));
   }
 
-  /** Per-part pose, in each part's own space: hips and shoulders are the node origins. */
+  /** Póza po částech, ve vlastním prostoru každé části: boky a ramena jsou počátky uzlů. */
   pose(): (part: string) => Mat4 | null {
     const swing = this.walking && this.alive ? Math.sin(this.stride) : 0;
     const aim = this.aim;
@@ -100,8 +100,8 @@ export class Body {
   }
 
   /**
-   * Where a ray first meets this body, if it does within `maxDistance`.
-   * `direction` must be unit length.
+   * Kde paprsek poprvé narazí na toto tělo, pokud k tomu dojde do `maxDistance`.
+   * `direction` musí mít jednotkovou délku.
    */
   hitBy(origin: Vec3, direction: Vec3, maxDistance: number): RayHit | null {
     if (!this.alive) return null;
@@ -124,7 +124,7 @@ export class Body {
   }
 }
 
-/** Nearest positive distance along a ray to a sphere, or null. */
+/** Nejbližší kladná vzdálenost podél paprsku ke kouli, nebo null. */
 function raySphere(o: Vec3, d: Vec3, c: Vec3, r: number): number | null {
   const ox = o.x - c.x;
   const oy = o.y - c.y;
@@ -136,7 +136,7 @@ function raySphere(o: Vec3, d: Vec3, c: Vec3, r: number): number | null {
   return t > 0 ? t : null;
 }
 
-/** Nearest positive distance along a ray to an infinite upright cylinder, or null. */
+/** Nejbližší kladná vzdálenost podél paprsku k nekonečnému svislému válci, nebo null. */
 function rayCylinder(o: Vec3, d: Vec3, cx: number, cz: number, r: number): number | null {
   const ox = o.x - cx;
   const oz = o.z - cz;
@@ -150,9 +150,9 @@ function rayCylinder(o: Vec3, d: Vec3, cx: number, cz: number, r: number): numbe
 }
 
 /**
- * Where a weapon sits in a body's right hand: past the end of the arm, barrel
- * along the arm, so raising the arm points the gun. `armMatrix` is the arm
- * part's rest matrix, `armPose` its pose this frame.
+ * Kde leží zbraň v pravé ruce postavy: za koncem paže, hlaveň podél paže,
+ * takže zvednutí paže namíří zbraň. `armMatrix` je klidová matice části paže,
+ * `armPose` její póza v tomto snímku.
  */
 export function handTransform(body: Mat4, armMatrix: Mat4, armPose: Mat4 | null, grip: Mat4): Mat4 {
   const arm = multiply(body, armMatrix);

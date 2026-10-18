@@ -4,10 +4,10 @@ import type { Rng } from '@/core/rng';
 import { Vehicle, type VehicleBody } from './vehicle';
 
 /**
- * City traffic: cars driving the street grid lane by lane, choosing a way at
- * every crossroads, queueing behind whatever is ahead and taking turns at
- * junctions. Cars follow their paths exactly (no physics), which keeps them
- * on the carriageway; the physics-driven player car meets them as obstacles.
+ * Městská doprava: auta projíždějí uliční síť pruh po pruhu, na každé
+ * křižovatce si volí směr, řadí se za tím, co je před nimi, a na křižovatkách
+ * se střídají. Auta jedou přesně po svých trasách (bez fyziky), což je drží
+ * na vozovce; hráčovo auto řízené fyzikou je potkává jako překážky.
  */
 
 export interface Point {
@@ -16,25 +16,25 @@ export interface Point {
 }
 
 interface PathPoint extends Point {
-  /** Direction of travel here, in the vehicle heading convention. */
+  /** Směr jízdy v tomto bodě, v konvenci headingu vozidla. */
   heading: number;
 }
 
-/** A stretch a car drives along: a lane between crossroads, or a way across one. */
+/** Úsek, po kterém auto jede: pruh mezi křižovatkami, nebo průjezd křižovatkou. */
 export interface Path {
   points: PathPoint[];
-  /** Distance along the path to each point. */
+  /** Vzdálenost podél trasy k jednotlivým bodům. */
   distances: number[];
   length: number;
 }
 
 export type Turn = 'straight' | 'right' | 'left';
 
-/** One direction of one street segment, crossroads to crossroads. */
+/** Jeden směr jednoho úseku ulice, od křižovatky ke křižovatce. */
 export interface Lane {
   from: Junction;
   to: Junction;
-  /** Index into DIRECTIONS. */
+  /** Index do DIRECTIONS. */
   direction: number;
   path: Path;
 }
@@ -42,11 +42,11 @@ export interface Lane {
 export interface Junction {
   x: number;
   z: number;
-  /** Lanes leaving, by direction; missing where the network ends. */
+  /** Odjezdové pruhy podle směru; chybí tam, kde síť končí. */
   exits: Array<Lane | undefined>;
-  /** Ways across, keyed by `${approach direction}:${turn}`. */
+  /** Průjezdy, s klíčem `${approach direction}:${turn}`. */
   ways: Map<string, Path>;
-  /** Cars inside or cleared to enter. */
+  /** Auta uvnitř nebo s povolením vjet. */
   occupants: Set<TrafficCar>;
 }
 
@@ -55,7 +55,7 @@ export interface RoadNetwork {
   lanes: Lane[];
 }
 
-/** Travel directions: north (-Z), east (+X), south (+Z), west (-X). Right turns add one. */
+/** Směry jízdy: sever (-Z), východ (+X), jih (+Z), západ (-X). Odbočení vpravo přičte jedna. */
 const DIRECTIONS: readonly Point[] = [
   { x: 0, z: -1 },
   { x: 1, z: 0 },
@@ -64,7 +64,7 @@ const DIRECTIONS: readonly Point[] = [
 ];
 const TURN_OFFSET: Record<Turn, number> = { straight: 0, right: 1, left: 3 };
 const TURN_SPEED: Record<Turn, number> = { straight: 9, right: 3, left: 5 };
-/** Odds of each way at a crossroads, before ruling out the ones that do not exist. */
+/** Šance jednotlivých směrů na křižovatce, před vyřazením těch, které neexistují. */
 const TURN_WEIGHT: Record<Turn, number> = { straight: 2, right: 1, left: 1 };
 
 const ARC_STEPS = 12;
@@ -73,25 +73,25 @@ const CRUISE = { min: 9, max: 13 };
 const ACCELERATION = 2.5;
 const COMFORT_BRAKING = 4;
 const HARD_BRAKING = 10;
-/** Bumper-to-bumper distance kept when queueing, metres. */
+/** Odstup nárazník–nárazník udržovaný v koloně, metry. */
 const MIN_GAP = 2;
-/** How close to the crossroads a car asks to cross, metres. */
+/** Jak blízko křižovatky auto žádá o průjezd, metry. */
 const REQUEST_DISTANCE = 6;
-/** Room a car needs past the crossroads before it may enter, beyond its own length. */
+/** Místo, které auto potřebuje za křižovatkou, než smí vjet, nad rámec vlastní délky. */
 const EXIT_ROOM = 3;
-/** After waiting this long for room on its way out, a car picks another way. */
+/** Po takto dlouhém čekání na místo na výjezdu si auto zvolí jiný směr. */
 const PATIENCE = 4;
-/** Sideways slack when deciding whether something is in a car's path. */
+/** Boční rezerva při rozhodování, zda je něco v dráze auta. */
 const LATERAL_MARGIN = 0.2;
-/** How far ahead a car looks for things to stop for, and how finely, metres. */
+/** Jak daleko dopředu auto hledá, kvůli čemu zastavit, a s jakým krokem, metry. */
 const SIGHT = 40;
 const SIGHT_STEP = 1;
 
-/** Builds the lanes and crossroads of every interior street; edge streets are half width. */
+/** Sestaví pruhy a křižovatky všech vnitřních ulic; okrajové ulice mají poloviční šířku. */
 export function buildRoadNetwork(layout: CityLayout): RoadNetwork {
   const { gridSize, streetWidth, sidewalkWidth } = layout.config;
   const { pitch } = layout;
-  // Half the carriageway: crossroads boxes and lane ends sit this far from the centre.
+  // Polovina vozovky: plochy křižovatek a konce pruhů leží takto daleko od středu.
   const half = streetWidth / 2 - sidewalkWidth;
   const lane = half / 2;
 
@@ -151,9 +151,9 @@ export function buildRoadNetwork(layout: CityLayout): RoadNetwork {
 }
 
 /**
- * The path across a crossroads, from the stop line to the far side: a straight
- * line, or a quarter circle tangent to both lanes — tight to the right, wide to
- * the left across the oncoming lane.
+ * Trasa přes křižovatku, od stopčáry na protější stranu: přímka, nebo
+ * čtvrtkruh tečný k oběma pruhům — vpravo těsný, vlevo široký přes protisměrný
+ * pruh.
  */
 function wayAcross(c: Point, approach: number, turn: Turn, half: number, lane: number): Path {
   const d = direction(approach);
@@ -186,15 +186,15 @@ function wayAcross(c: Point, approach: number, turn: Turn, half: number, lane: n
   return makePath(points);
 }
 
-/** A car in traffic: a `Vehicle` for drawing, driven along the network. */
+/** Auto v provozu: `Vehicle` pro vykreslení, vedené po síti. */
 export class TrafficCar {
   readonly vehicle: Vehicle;
-  /** The lane being driven, or the one just left while crossing. */
+  /** Pruh, po kterém jede, nebo ten právě opuštěný při průjezdu křižovatkou. */
   lane: Lane;
-  /** Where it will go at the end of `lane`. */
+  /** Kam pojede na konci `lane`. */
   turn: Turn = 'straight';
   crossing = false;
-  /** Cleared to enter the crossroads at the end of `lane`. */
+  /** Má povolení vjet do křižovatky na konci `lane`. */
   cleared = false;
 
   private distance: number;
@@ -225,14 +225,14 @@ export class TrafficCar {
     return way;
   }
 
-  /** The lane it will be on after the crossroads at the end of this one. */
+  /** Pruh, na kterém bude po křižovatce na konci tohoto pruhu. */
   get exit(): Lane {
     const exit = this.lane.to.exits[(this.lane.direction + TURN_OFFSET[this.turn]) % 4];
     if (!exit) throw new Error(`No exit ${this.turn} at a crossroads`);
     return exit;
   }
 
-  /** The car's footprint, for others to stop behind and for the player to hit. */
+  /** Půdorys auta, aby za ním ostatní zastavili a hráč do něj mohl narazit. */
   obstacle(): Obstacle {
     const { vehicle } = this;
     return {
@@ -248,7 +248,7 @@ export class TrafficCar {
   update(dt: number, obstacles: readonly Obstacle[], rng: Rng): void {
     const { vehicle } = this;
     const halfLength = vehicle.body.length / 2;
-    // From the front bumper, which is what has to stay out of the crossroads.
+    // Od předního nárazníku, protože ten musí zůstat mimo křižovatku.
     const remaining = this.path.length - this.distance - (this.crossing ? 0 : halfLength);
 
     if (!this.crossing && !this.cleared && remaining < REQUEST_DISTANCE) {
@@ -264,7 +264,7 @@ export class TrafficCar {
 
     let target = this.crossing ? TURN_SPEED[this.turn] : this.cruise;
     if (!this.crossing) {
-      // Stop at the line until cleared, then roll into the turn at its speed.
+      // Stát na čáře do povolení, pak vjet do odbočení jeho rychlostí.
       const endSpeed = this.cleared ? TURN_SPEED[this.turn] : 0;
       const room = Math.max(this.cleared ? remaining + halfLength : remaining - 0.5, 0);
       target = Math.min(target, Math.sqrt(endSpeed * endSpeed + 2 * COMFORT_BRAKING * room));
@@ -304,7 +304,7 @@ export class TrafficCar {
     this.steerAlongPath(dt);
   }
 
-  /** Clear to cross if nobody inside is on a crossing path and there is room beyond. */
+  /** Smí projet, pokud nikdo uvnitř nejede po křížící se trase a za křižovatkou je místo. */
   private requestCrossing(obstacles: readonly Obstacle[]): boolean {
     const junction = this.lane.to;
     for (const other of junction.occupants) {
@@ -317,8 +317,8 @@ export class TrafficCar {
   }
 
   /**
-   * Something sits in the first few metres of the lane it means to take, or will
-   * once the cars already crossing toward that lane have got there.
+   * V prvních několika metrech pruhu, do kterého chce vjet, něco stojí, nebo bude
+   * stát, až tam dojedou auta, která už k tomuto pruhu projíždějí křižovatkou.
    */
   private exitBlocked(obstacles: readonly Obstacle[]): boolean {
     const exit = this.exit;
@@ -340,10 +340,9 @@ export class TrafficCar {
   }
 
   /**
-   * Bumper-to-bumper distance to the nearest thing on the road the car is about
-   * to drive, up to its sight. Following the path rather than looking straight
-   * ahead means a car halfway round a corner does not stop for one waiting at
-   * the side.
+   * Vzdálenost nárazník–nárazník k nejbližší věci na cestě, kterou auto pojede,
+   * až do jeho dohledu. Díky sledování trasy místo pohledu přímo vpřed auto
+   * v půli zatáčky nezastaví kvůli jinému, které čeká na straně.
    */
   private gapAhead(obstacles: readonly Obstacle[]): number {
     const { vehicle } = this;
@@ -365,7 +364,7 @@ export class TrafficCar {
     return SIGHT;
   }
 
-  /** Where the car's centre will be `ahead` metres on, through the crossroads and out. */
+  /** Kde bude střed auta o `ahead` metrů dál, přes křižovatku a ven z ní. */
   private pointAhead(ahead: number): Point {
     const route = this.crossing
       ? [this.way, this.exit.path]
@@ -419,7 +418,7 @@ export class TrafficCar {
     this.vehicle.y = 0;
   }
 
-  /** Front wheels follow the curvature of the path, eased so they do not snap. */
+  /** Přední kola sledují zakřivení trasy, plynule, aby necukala. */
   private steerAlongPath(dt: number): void {
     const { points, distances } = this.path;
     const a = points[this.segment];
@@ -432,15 +431,15 @@ export class TrafficCar {
   }
 }
 
-/** All the traffic in town. */
+/** Veškerá doprava ve městě. */
 export class Traffic {
   readonly cars: TrafficCar[] = [];
 
   constructor(readonly network: RoadNetwork) {}
 
   /**
-   * Places a car somewhere random on the network, clear of every other car and
-   * of `avoid`. Returns null if no free spot turned up.
+   * Umístí auto na náhodné místo v síti, mimo všechna ostatní auta i mimo
+   * `avoid`. Vrátí null, pokud se volné místo nenašlo.
    */
   spawn(body: VehicleBody, rng: Rng, avoid: readonly Obstacle[] = []): TrafficCar | null {
     const clearance = body.length + MIN_GAP * 2;
@@ -460,26 +459,29 @@ export class Traffic {
     return null;
   }
 
-  /** Takes a car out of traffic for good, giving up any crossroads it had claimed. */
+  /** Natrvalo vyřadí auto z provozu a uvolní každou křižovatku, kterou si zabralo. */
   remove(car: TrafficCar): void {
     const index = this.cars.indexOf(car);
     if (index >= 0) this.cars.splice(index, 1);
     for (const junction of this.network.junctions) junction.occupants.delete(car);
   }
 
-  /** Footprints of every car, for the collision world and for each other. */
+  /** Půdorysy všech aut, pro kolizní svět i pro sebe navzájem. */
   obstacles(): Obstacle[] {
     return this.cars.map((car) => car.obstacle());
   }
 
-  /** `others` are what traffic must also stop for: the player, the player's car. */
+  /** `others` je to, kvůli čemu musí doprava také zastavit: hráč, hráčovo auto. */
   update(dt: number, others: readonly Obstacle[], rng: Rng): void {
     const all = [...this.obstacles(), ...others];
     for (const car of this.cars) car.update(dt, all, rng);
   }
 }
 
-/** Two cars may share a crossroads if they come from the same way, or head-on with neither turning left. */
+/**
+ * Dvě auta smějí sdílet křižovatku, pokud přijíždějí ze stejného směru, nebo proti sobě
+ * a žádné neodbočuje vlevo.
+ */
 function compatible(a: TrafficCar, b: TrafficCar): boolean {
   const approachA = a.lane.direction;
   const approachB = b.lane.direction;
@@ -502,7 +504,7 @@ function direction(index: number): Point {
   return DIRECTIONS[((index % 4) + 4) % 4] ?? { x: 0, z: -1 };
 }
 
-/** The point `distance` metres along a path. */
+/** Bod `distance` metrů podél trasy. */
 function pointOn(path: Path, distance: number): Point {
   const { points, distances } = path;
   for (let i = 0; i + 1 < points.length; i++) {
@@ -518,10 +520,10 @@ function pointOn(path: Path, distance: number): Point {
   return points[0] ?? { x: 0, z: 0 };
 }
 
-/** Right of a travel direction, in the vehicle's heading convention. */
+/** Pravá strana ke směru jízdy, v konvenci headingu vozidla. */
 const rightOf = (d: Point): Point => ({ x: -d.z, z: d.x });
 
-/** Heading that faces along `d`: 0 is -Z, pi/2 is +X. */
+/** Heading mířící podél `d`: 0 je -Z, pi/2 je +X. */
 const headingOf = (d: Point): number => Math.atan2(d.x, -d.z);
 
 const wrapAngle = (angle: number): number => Math.atan2(Math.sin(angle), Math.cos(angle));

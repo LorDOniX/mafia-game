@@ -1,10 +1,10 @@
 import type { CityLayout, Rect } from '@/city/layout';
 
-/** Metres across the visible map. */
+/** Šířka viditelné mapy v metrech. */
 const RANGE = 160;
-/** Resolution of the pre-drawn city, pixels per metre. */
+/** Rozlišení předkresleného města, pixely na metr. */
 const BAKE_SCALE = 2;
-/** How far the view cone reaches, metres. */
+/** Dosah zorného kužele, v metrech. */
 const CONE_LENGTH = 70;
 
 const ROAD = '#2b2a28';
@@ -13,15 +13,15 @@ const SQUARE = '#625d53';
 const PARK = '#4b5a3c';
 const BUILDING = '#a99d84';
 const TREE = '#2f4a26';
-/** Crown radius drawn on the map, metres. */
+/** Poloměr koruny kreslený na mapě, v metrech. */
 const TREE_RADIUS = 2;
 
 export interface MapView {
   x: number;
   z: number;
-  /** Camera yaw: 0 looks toward -Z, which is up on the map. */
+  /** Yaw kamery: 0 se dívá směrem k -Z, což je na mapě nahoře. */
   yaw: number;
-  /** Horizontal field of view, radians. */
+  /** Horizontální zorné pole, v radiánech. */
   fov: number;
 }
 
@@ -34,17 +34,17 @@ export interface MapCar {
   color: string;
 }
 
-/** Tinted areas (districts) and dots (people) drawn over the map. */
+/** Obarvené oblasti (čtvrti) a tečky (lidé) kreslené přes mapu. */
 export interface MapMarks {
   areas: ReadonlyArray<{ rect: Rect; color: string }>;
   dots: ReadonlyArray<{ x: number; z: number; color: string }>;
 }
 
 const NO_MARKS: MapMarks = { areas: [], dots: [] };
-/** Radius of a person's dot, metres. */
+/** Poloměr tečky osoby, v metrech. */
 const DOT_RADIUS = 1.6;
 
-/** North-up minimap centred on the camera, with its view cone and every car. */
+/** Minimapa se severem nahoře, centrovaná na kameru, s jejím zorným kuželem a všemi auty. */
 export class Minimap {
   private readonly ctx: CanvasRenderingContext2D;
   private readonly city: HTMLCanvasElement;
@@ -73,7 +73,7 @@ export class Minimap {
     ctx.fillStyle = ROAD;
     ctx.fillRect(0, 0, size, size);
 
-    // World to canvas: x right, z down, the camera in the middle.
+    // Ze světa na canvas: x doprava, z dolů, kamera uprostřed.
     ctx.setTransform(scale, 0, 0, scale, size / 2 - view.x * scale, size / 2 - view.z * scale);
     ctx.imageSmoothingEnabled = true;
     ctx.drawImage(this.city, 0, 0, this.city.width / BAKE_SCALE, this.city.height / BAKE_SCALE);
@@ -83,7 +83,7 @@ export class Minimap {
       fillRect(ctx, rect);
     }
 
-    // Canvas angles run clockwise from +X; yaw 0 points up the map.
+    // Úhly canvasu běží ve směru hodinových ručiček od +X; yaw 0 míří na mapě nahoru.
     const facing = view.yaw - Math.PI / 2;
     const cone = ctx.createRadialGradient(view.x, view.z, 0, view.x, view.z, CONE_LENGTH);
     cone.addColorStop(0, 'rgba(255, 236, 170, 0.55)');
@@ -101,7 +101,7 @@ export class Minimap {
       ctx.rotate(car.heading);
       ctx.fillStyle = car.color;
       ctx.fillRect(-car.width / 2, -car.length / 2, car.width, car.length);
-      // Bonnet marker, so the direction of travel reads at a glance.
+      // Značka kapoty, aby byl směr jízdy patrný na první pohled.
       ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
       ctx.fillRect(-car.width / 2, -car.length / 2, car.width, car.length * 0.2);
       ctx.restore();
@@ -125,7 +125,7 @@ export class Minimap {
   }
 }
 
-/** The static city, drawn once: streets, sidewalks, open blocks, buildings and trees. */
+/** Statické město, nakreslené jednou: ulice, chodníky, otevřené bloky, budovy a stromy. */
 function bakeCity(layout: CityLayout): HTMLCanvasElement {
   const { bounds } = layout;
   const canvas = document.createElement('canvas');

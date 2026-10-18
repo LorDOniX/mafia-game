@@ -2,7 +2,7 @@ import { verticalExtent, type ModelData } from '@/gfx/gltf';
 import { multiply, rotationY, scaling, translate, type Mat4 } from '@/math/mat4';
 import type { TreeSpot } from './layout';
 
-/** Which species stands at a spot, from the street or park list as its kind says. */
+/** Který druh stojí na místě, ze seznamu uličních nebo parkových podle jeho typu. */
 export function speciesAt<T>(spot: TreeSpot, street: readonly T[], park: readonly T[]): T {
   const list = spot.kind === 'street' ? street : park;
   const species = list[Math.min(Math.floor(spot.variant * list.length), list.length - 1)];
@@ -10,7 +10,7 @@ export function speciesAt<T>(spot: TreeSpot, street: readonly T[], park: readonl
   return species;
 }
 
-/** Model-to-world for a tree: base on the ground, scaled to `height`, turned at random. */
+/** Model-to-world pro strom: pata na terénu, škálováno na `height`, náhodně otočen. */
 export function treeTransform(
   spot: TreeSpot,
   model: ModelData,

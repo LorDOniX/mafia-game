@@ -36,7 +36,7 @@ export function createProgram(
   gl.attachShader(program, fs);
   gl.linkProgram(program);
 
-  // Shaders are reference-counted by the program; safe to drop our handles.
+  // Program si u shaderů počítá reference; naše handly lze bezpečně uvolnit.
   gl.deleteShader(vs);
   gl.deleteShader(fs);
 

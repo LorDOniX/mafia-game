@@ -2,7 +2,7 @@
 
 in vec3 a_position;
 in vec3 a_normal;
-/** xyz = texture U direction in world space, w = bitangent handedness. */
+/** xyz = směr texturové souřadnice U ve světovém prostoru, w = orientace bitangenty. */
 in vec4 a_tangent;
 in vec2 a_uv;
 in float a_layer;

@@ -56,7 +56,7 @@ describe('applyCustomFacades', () => {
     const layout = generateCity({ seed: 5 });
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-    // Street centrelines sit on whole multiples of the pitch.
+    // Osy ulic leží na celých násobcích rozteče.
     applyCustomFacades(layout, [facade({ targets: [{ at: { x: layout.pitch, z: 40 } }] })]);
 
     expect(warn).toHaveBeenCalledOnce();
@@ -90,7 +90,7 @@ describe('applyCustomFacades', () => {
 });
 
 describe('custom facade walls', () => {
-  // 12 m across is 3 bays; 18 m at 3.6 m a storey is 5 storeys.
+  // 12 m na šířku jsou 3 pole; 18 m při 3.6 m na podlaží je 5 podlaží.
   const building: Building = {
     footprint: { minX: 100, maxX: 112, minZ: 200, maxZ: 212 },
     height: 18,

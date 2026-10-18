@@ -1,6 +1,6 @@
 import { cross, dot, normalize, sub, type Vec3 } from './vec3';
 
-/** Column-major 4x4 matrix, layout matches what WebGL expects. */
+/** Matice 4x4 po sloupcích (column-major), rozložení odpovídá očekávání WebGL. */
 export type Mat4 = Float32Array;
 
 export function identity(out: Mat4 = new Float32Array(16)): Mat4 {
@@ -49,7 +49,7 @@ export function perspective(
   return out;
 }
 
-/** Right-handed view matrix looking from `eye` toward `center`. */
+/** Pravotočivá view matice s pohledem z `eye` směrem k `center`. */
 export function lookAt(eye: Vec3, center: Vec3, up: Vec3, out: Mat4 = new Float32Array(16)): Mat4 {
   const z = normalize(sub(eye, center));
   const x = normalize(cross(up, z));
@@ -74,7 +74,7 @@ export function lookAt(eye: Vec3, center: Vec3, up: Vec3, out: Mat4 = new Float3
   return out;
 }
 
-/** Copies `src` into `out` but zeroes the translation column. Used by the skybox. */
+/** Zkopíruje `src` do `out`, ale vynuluje sloupec posunu. Používá ho skybox. */
 export function stripTranslation(src: Mat4, out: Mat4 = new Float32Array(16)): Mat4 {
   out.set(src);
   out[12] = 0;
@@ -113,7 +113,7 @@ export function scaling(s: number, out: Mat4 = identity()): Mat4 {
   return out;
 }
 
-/** Rotation about +X. Positive angles turn +Y toward +Z. */
+/** Rotace kolem +X. Kladné úhly otáčejí +Y směrem k +Z. */
 export function rotationX(angle: number, out: Mat4 = identity()): Mat4 {
   const c = Math.cos(angle);
   const s = Math.sin(angle);
@@ -125,7 +125,7 @@ export function rotationX(angle: number, out: Mat4 = identity()): Mat4 {
   return out;
 }
 
-/** Rotation about +Y. Positive angles turn +Z toward +X. */
+/** Rotace kolem +Y. Kladné úhly otáčejí +Z směrem k +X. */
 export function rotationY(angle: number, out: Mat4 = identity()): Mat4 {
   const c = Math.cos(angle);
   const s = Math.sin(angle);
@@ -137,7 +137,7 @@ export function rotationY(angle: number, out: Mat4 = identity()): Mat4 {
   return out;
 }
 
-/** Rotation about +Z. Positive angles turn +X toward +Y. */
+/** Rotace kolem +Z. Kladné úhly otáčejí +X směrem k +Y. */
 export function rotationZ(angle: number, out: Mat4 = identity()): Mat4 {
   const c = Math.cos(angle);
   const s = Math.sin(angle);
@@ -150,8 +150,8 @@ export function rotationZ(angle: number, out: Mat4 = identity()): Mat4 {
 }
 
 /**
- * Translation * rotation * scale, the order glTF composes a node's TRS in.
- * `rotation` is a unit quaternion as [x, y, z, w].
+ * Posun * rotace * měřítko, v tomto pořadí glTF skládá TRS uzlu.
+ * `rotation` je jednotkový kvaternion ve tvaru [x, y, z, w].
  */
 export function fromTRS(
   translation: readonly number[],
@@ -193,7 +193,7 @@ export function fromTRS(
   return out;
 }
 
-/** Applies `m` to a point (w = 1). */
+/** Aplikuje `m` na bod (w = 1). */
 export function transformPoint(m: Mat4, p: Vec3): Vec3 {
   const at = (i: number): number => m[i] ?? 0;
   return {

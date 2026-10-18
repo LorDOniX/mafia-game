@@ -1,36 +1,36 @@
 import { rectContains, type CityLayout, type Rect } from './layout';
 
 const CELL_SIZE = 20;
-/** Half the side of the square that stands in for a tree trunk. */
+/** Polovina strany čtverce, který zastupuje kmen stromu. */
 export const TRUNK_RADIUS = 0.3;
 export const LAMP_POST_RADIUS = 0.15;
-/** Heights for shots and sight lines, metres; buildings carry their own. */
+/** Výšky pro výstřely a linie pohledu, metry; budovy mají vlastní. */
 const TRUNK_HEIGHT = 3;
 const LAMP_POST_HEIGHT = 5.3;
 const CAR_HEIGHT = 1.6;
-/** How finely a ray is stepped through the world, metres. */
+/** Jak jemně se paprsek krokuje světem, metry. */
 const RAY_STEP = 0.2;
 
-/** A box that moves: a car's footprint, in the vehicle heading convention. */
+/** Pohyblivý box: půdorys auta v konvenci natočení vozidla. */
 export interface Obstacle {
   x: number;
   z: number;
-  /** 0 faces -Z, pi/2 faces +X. */
+  /** 0 míří k -Z, pi/2 míří k +X. */
   heading: number;
   halfLength: number;
   halfWidth: number;
-  /** How tall it stands, for rays; a car's height if left out. */
+  /** Jak je vysoký, pro paprsky; pokud chybí, použije se výška auta. */
   height?: number;
-  /** Whatever the obstacle stands for, so a car can ignore its own box. */
+  /** Cokoli, co překážka představuje, aby auto mohlo ignorovat svůj vlastní box. */
   owner?: unknown;
 }
 
 /**
- * Uniform grid over building footprints, tree trunks and lamp posts.
+ * Rovnoměrná mřížka nad půdorysy budov, kmeny stromů a sloupy lamp.
  *
- * The city is a few hundred metres across with ~700 buildings, so testing every
- * footprint per frame would be wasteful; bucketing by cell keeps each query to a
- * handful of candidates.
+ * Město má několik set metrů napříč a ~700 budov, takže testovat každý půdorys
+ * v každém snímku by bylo zbytečné; rozdělení do buněk omezí každý dotaz na
+ * hrstku kandidátů.
  */
 export class CityCollision {
   private readonly cells = new Map<number, Rect[]>();
@@ -76,7 +76,7 @@ export class CityCollision {
     return Math.max(0, Math.floor(coord / CELL_SIZE));
   }
 
-  /** Footprints in the cells overlapping a radius around (x, z). */
+  /** Půdorysy v buňkách, které zasahují do okruhu kolem (x, z). */
   private candidates(x: number, z: number, radius: number): Rect[] {
     const found: Rect[] = [];
     const minI = this.cellIndex(x - radius);
@@ -96,7 +96,7 @@ export class CityCollision {
     return found;
   }
 
-  /** True if a circle of `radius` at (x, z) overlaps a building, trunk, post or car. */
+  /** True, pokud kruh o poloměru `radius` v (x, z) zasahuje do budovy, kmene, sloupu či auta. */
   overlaps(x: number, z: number, radius: number, ignore?: unknown): boolean {
     for (const rect of this.candidates(x, z, radius)) {
       const nearestX = Math.min(Math.max(x, rect.minX), rect.maxX);
@@ -109,15 +109,15 @@ export class CityCollision {
   }
 
   /**
-   * Things that move, replaced every frame: cars, so the player bumps into
-   * traffic and traffic is solid underfoot. `ignore` in the queries skips the
-   * asker's own entry.
+   * Věci, které se pohybují, nahrazované každý snímek: auta, aby hráč narážel
+   * do provozu a provoz byl pod nohama pevný. `ignore` v dotazech přeskakuje
+   * vlastní záznam tazatele.
    */
   setObstacles(obstacles: readonly Obstacle[]): void {
     this.obstacles = obstacles;
   }
 
-  /** True if a circle at (x, z) overlaps something solid or reaches past the map edge. */
+  /** True, pokud kruh v (x, z) zasahuje do něčeho pevného nebo přes okraj mapy. */
   blocked(x: number, z: number, radius: number, ignore?: unknown): boolean {
     const { bounds } = this;
     return (
@@ -130,10 +130,10 @@ export class CityCollision {
   }
 
   /**
-   * Slides a circle from its current position toward a target.
+   * Posune kruh z aktuální pozice směrem k cíli.
    *
-   * Each axis is resolved on its own so that walking into a wall at an angle
-   * slides along it instead of stopping dead.
+   * Každá osa se řeší zvlášť, takže chůze do zdi pod úhlem po ní klouže
+   * místo okamžitého zastavení.
    */
   resolve(
     fromX: number,
@@ -155,8 +155,8 @@ export class CityCollision {
   }
 
   /**
-   * How far a ray travels before it hits the ground, a building, trunk, post
-   * or car, up to `maxDistance`. Used for shots and for lines of sight.
+   * Jak daleko paprsek doletí, než narazí na zem, budovu, kmen, sloup
+   * nebo auto, nejvýše `maxDistance`. Používá se pro výstřely a linie pohledu.
    */
   raycast(
     origin: { x: number; y: number; z: number },
@@ -181,7 +181,7 @@ export class CityCollision {
     return maxDistance;
   }
 
-  /** Sidewalks and plazas sit a kerb above the roadway. */
+  /** Chodníky a náměstí leží o obrubník výš než vozovka. */
   groundHeightAt(x: number, z: number): number {
     const { config, pitch, blocks } = this.layout;
     const i = Math.floor(x / pitch);
@@ -199,7 +199,7 @@ export class CityCollision {
 const clamp = (value: number, min: number, max: number): number =>
   Math.min(Math.max(value, min), max);
 
-/** True if a circle at (x, z) overlaps an obstacle's footprint. */
+/** True, pokud kruh v (x, z) zasahuje do půdorysu překážky. */
 export function circleHitsObstacle(x: number, z: number, radius: number, o: Obstacle): boolean {
   const dx = x - o.x;
   const dz = z - o.z;

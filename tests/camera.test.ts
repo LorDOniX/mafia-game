@@ -73,7 +73,7 @@ describe('Camera basis', () => {
 
     const w = clip[3] ?? 0;
     expect(w).toBeGreaterThan(0);
-    // A point straight ahead lands at the centre of the screen.
+    // Bod přímo vpředu dopadne do středu obrazovky.
     expect((clip[0] ?? 0) / w).toBeCloseTo(0);
     expect((clip[1] ?? 0) / w).toBeCloseTo(0);
   });

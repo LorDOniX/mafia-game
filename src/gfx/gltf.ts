@@ -3,59 +3,59 @@ import type { Vec3 } from '@/math/vec3';
 import { loadImageBitmap } from './image';
 
 /**
- * A minimal glTF 2.0 loader, binary (.glb) only.
+ * Minimalistický loader glTF 2.0, pouze binární (.glb).
  *
- * It reads what a prop needs and nothing more: triangle meshes with
- * positions, normals and one UV set, the node hierarchy, a base colour per
- * material and a single base-colour texture. No animation, skinning, morph
- * targets or PBR. Anything it cannot honour throws with a reason, rather than
- * drawing something wrong.
+ * Čte to, co rekvizita potřebuje, a nic víc: trojúhelníkové meshe s
+ * pozicemi, normálami a jednou sadou UV, hierarchii uzlů, základní barvu pro
+ * každý materiál a jedinou texturu základní barvy. Žádná animace, skinning, morph
+ * targety ani PBR. Cokoli, co nedokáže dodržet, vyhodí chybu s důvodem, místo
+ * toho, aby vykreslil něco špatně.
  *
- * Mesh nodes come out as separate parts, keyed by node name, so a caller can
- * move pieces independently — spin wheels, open doors. A node whose mesh uses
- * several materials becomes several parts under the same name.
+ * Uzly s meshem vycházejí jako samostatné části s klíčem podle názvu uzlu, takže
+ * volající může hejbat díly nezávisle — točit koly, otevírat dveře. Uzel, jehož
+ * mesh používá více materiálů, se stane více částmi se stejným názvem.
  */
 
-/** position(3) + normal(3) + uv(2) */
+/** pozice(3) + normála(3) + uv(2) */
 export const FLOATS_PER_MODEL_VERTEX = 8;
 
 export interface ModelPart {
   name: string;
-  /** The node's transform into model space, parents included. */
+  /** Transformace uzlu do prostoru modelu, včetně rodičů. */
   matrix: Mat4;
   vertices: Float32Array;
   indices: Uint32Array;
-  /** Bounds of the part's own geometry, before `matrix`. */
+  /** Hranice vlastní geometrie části, před aplikací `matrix`. */
   min: Vec3;
   max: Vec3;
-  /** The material's colour, multiplied over the texture. */
+  /** Barva materiálu, násobená přes texturu. */
   baseColor: RGBA;
-  /** Light the material gives off itself, shown only while lights are on. */
+  /** Světlo, které materiál sám vyzařuje, zobrazené jen při rozsvícených světlech. */
   emissive: RGB;
 }
 
 export type RGBA = [number, number, number, number];
 export type RGB = [number, number, number];
 
-/** A `uri` image is relative to the model file, as glTF specifies. */
+/** Obrázek typu `uri` je relativní k souboru modelu, jak určuje glTF. */
 export type ModelImage =
   | { kind: 'uri'; uri: string }
   | { kind: 'embedded'; bytes: Uint8Array<ArrayBuffer>; mimeType: string };
 
 export interface ModelData {
   parts: ModelPart[];
-  /** The first base-colour texture any material uses. */
+  /** První textura základní barvy, kterou používá některý materiál. */
   image: ModelImage | null;
   doubleSided: boolean;
 }
 
 export interface LoadedModel {
   data: ModelData;
-  /** Null when the model has no texture or it failed to load. */
+  /** Null, pokud model nemá texturu nebo se ji nepodařilo načíst. */
   image: ImageBitmap | null;
 }
 
-/** Lowest and highest point of a model at rest, in model space. */
+/** Nejnižší a nejvyšší bod modelu v klidu, v prostoru modelu. */
 export function verticalExtent(model: ModelData): { minY: number; maxY: number } {
   let minY = Infinity;
   let maxY = -Infinity;
@@ -73,8 +73,8 @@ export async function loadModel(url: string): Promise<LoadedModel> {
   const response = await fetch(url);
   if (!response.ok) throw new Error(`Failed to load ${url}: HTTP ${response.status}`);
 
-  // A mistyped path gets Vite's HTML fallback with a 200, which the magic
-  // number check in parseGlb turns into a clear error.
+  // Překlep v cestě vrátí HTML fallback Vite se stavem 200, což kontrola
+  // magického čísla v parseGlb převede na srozumitelnou chybu.
   const data = parseGlb(await response.arrayBuffer());
   return { data, image: await loadModelImage(url, data.image) };
 }
@@ -97,7 +97,7 @@ async function loadModelImage(
   }
 }
 
-// Only the slice of the glTF schema this loader reads.
+// Jen ta část schématu glTF, kterou tento loader čte.
 interface GltfJson {
   scene?: number;
   scenes?: Array<{ nodes?: number[] }>;
@@ -165,9 +165,9 @@ const COMPONENTS: Record<string, number> = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 
 const TRIANGLES = 4;
 
 /**
- * Required extensions it is safe to read past. Unlit materials are shaded like
- * any other, so characters sit in the city's light; texture transforms are
- * accepted only as the identity, which is all Kenney's kits use.
+ * Povinná rozšíření, která lze bezpečně přejít. Unlit materiály se stínují jako
+ * kterékoli jiné, takže postavy zapadnou do osvětlení města; transformace textur
+ * se přijímají jen jako identita, což je vše, co Kenneyho kity používají.
  */
 const TOLERATED_EXTENSIONS = new Set(['KHR_materials_unlit', 'KHR_texture_transform']);
 
@@ -195,7 +195,7 @@ export function parseGlb(buffer: ArrayBuffer): ModelData {
     } else if (type === CHUNK_BIN) {
       bin = new DataView(buffer, start, length);
     }
-    // Chunk lengths already include their 4-byte padding.
+    // Délky chunků už zahrnují své 4bajtové zarovnání.
     offset = start + length;
   }
 
@@ -206,7 +206,7 @@ export function parseGlb(buffer: ArrayBuffer): ModelData {
 function readModel(gltf: GltfJson, bin: DataView | null): ModelData {
   const unsupported = (gltf.extensionsRequired ?? []).filter((e) => !TOLERATED_EXTENSIONS.has(e));
   if (unsupported.length) {
-    // Typically Draco or meshopt compression; re-export without it.
+    // Typicky komprese Draco nebo meshopt; exportujte znovu bez ní.
     throw new Error(`Unsupported required extensions: ${unsupported.join(', ')}`);
   }
   if (gltf.buffers?.some((buffer) => buffer.uri !== undefined)) {
@@ -248,7 +248,7 @@ function readModel(gltf: GltfJson, bin: DataView | null): ModelData {
         const { baseColor, emissive } = materialColor(gltf, material);
         model.parts.push(readMesh(gltf, bin, primitives, name, matrix, baseColor, emissive));
 
-        // One texture per model: the first material that names one wins.
+        // Jedna textura na model: vyhrává první materiál, který nějakou uvádí.
         if (!materialSeen && material !== undefined) {
           materialSeen = true;
           readMaterial(gltf, bin, material, model);
@@ -295,7 +295,7 @@ function readMesh(
         ? readIndices(gltf, bin, primitive.indices)
         : Uint32Array.from({ length: count }, (_, i) => i);
 
-    // Primitives often share one vertex buffer; keep only the vertices this one uses.
+    // Primitivy často sdílejí jeden vertex buffer; ponecháme jen vrcholy, které používá tento.
     const remap = new Map<number, number>();
     for (const i of source) {
       let mapped = remap.get(i);
@@ -371,7 +371,7 @@ function readMaterial(gltf: GltfJson, bin: DataView | null, index: number, model
   } else if (image.bufferView !== undefined && image.mimeType) {
     const { start, length } = viewRange(gltf, bin, image.bufferView);
     if (!bin) throw new Error('Embedded image but no binary chunk');
-    // Copied out, so the image does not keep the whole GLB alive.
+    // Zkopírováno ven, aby obrázek nedržel naživu celý GLB.
     const bytes = new Uint8Array(bin.buffer, bin.byteOffset + start, length).slice();
     model.image = { kind: 'embedded', bytes, mimeType: image.mimeType };
   }
@@ -413,7 +413,7 @@ function readFloats(
   }
 
   const out = new Float32Array(accessor.count * components);
-  // An accessor with no buffer view is all zeros by definition.
+  // Accessor bez buffer view obsahuje z definice samé nuly.
   if (accessor.bufferView === undefined || !bin) return out;
 
   const { start, stride = components * 4 } = viewRange(gltf, bin, accessor.bufferView);

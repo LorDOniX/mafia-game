@@ -48,7 +48,7 @@ describe('Animal', () => {
   });
 
   it('will not walk into a trunk', () => {
-    // A wall of trunks down the middle of the park.
+    // Stěna kmenů uprostřed parku.
     const wall: AnimalWorld = { overlaps: (x, _z, r) => Math.abs(x - 131) < r + 0.3 };
     const animal = new Animal(dog, park, 0, createRng(6), wall);
     const side = Math.sign(animal.x - 131);

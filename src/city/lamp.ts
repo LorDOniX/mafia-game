@@ -4,16 +4,16 @@ import { identity, multiply, rotationY, translate, type Mat4 } from '@/math/mat4
 import type { LampSpot } from './layout';
 
 /**
- * A 1930s street lamp, built from boxes so it needs no art: a cast-iron post
- * with an arm reaching out over the road (model +Z) and a lantern hanging
- * from it. Swap in a glTF model later by building `ModelData` from that instead.
+ * Pouliční lampa ze 30. let složená z kvádrů, takže nepotřebuje žádnou grafiku:
+ * litinový sloup s ramenem vysunutým nad silnici (model +Z) a lucernou na něm
+ * zavěšenou. Později ji lze nahradit glTF modelem sestavením `ModelData` z něj.
  */
 
 const IRON: RGBA = [0.11, 0.11, 0.12, 1];
 const GLASS: RGBA = [1.0, 0.93, 0.78, 1];
 const GLOW: RGB = [1.0, 0.8, 0.5];
 
-/** Where the bulb sits in model space: how far out along the arm, how high. */
+/** Kde v prostoru modelu sedí žárovka: jak daleko podél ramene a jak vysoko. */
 const BULB_REACH = 1.25;
 const BULB_HEIGHT = 4.6;
 
@@ -25,7 +25,7 @@ const LIGHT_OUTER = (70 * Math.PI) / 180;
 
 type V3 = [number, number, number];
 
-/** Outward normal axis and sign, then two tangent axes whose cross product is that normal. */
+/** Osa a znaménko vnější normály, pak dvě tečné osy, jejichž vektorový součin je ta normála. */
 const FACES: ReadonlyArray<[number, number, number, number]> = [
   [0, 1, 1, 2],
   [0, -1, 2, 1],
@@ -48,12 +48,12 @@ export function createLampModel(): ModelData {
   return { parts: [iron, glass], image: null, doubleSided: false };
 }
 
-/** Model-to-world for a lamp standing on the sidewalk. */
+/** Model-to-world pro lampu stojící na chodníku. */
 export function lampTransform(spot: LampSpot, groundY: number): Mat4 {
   return multiply(translate(spot.x, groundY, spot.z), rotationY(spot.rotation));
 }
 
-/** The pool of light a lamp casts, straight down from its lantern. */
+/** Kruh světla, který lampa vrhá z lucerny přímo dolů. */
 export function lampLight(spot: LampSpot, groundY: number): SpotLight {
   return {
     position: {
@@ -86,7 +86,7 @@ function part(name: string, baseColor: RGBA, emissive: RGB, boxes: Array<[V3, V3
       const normal: V3 = [0, 0, 0];
       normal[axis] = sign;
 
-      // Counter-clockwise seen from outside, since u x v points along the normal.
+      // Proti směru hodinových ručiček při pohledu zvenku, protože u x v míří podél normály.
       for (const [su, sv] of [[-1, -1], [1, -1], [1, 1], [-1, 1]] as const) {
         const p: V3 = [...centre];
         const offset = (k: number, by: number): void => {

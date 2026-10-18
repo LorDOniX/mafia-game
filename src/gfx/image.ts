@@ -1,9 +1,9 @@
 /**
- * Image loading helpers.
+ * Pomocné funkce pro načítání obrázků.
  *
- * Everything goes through `createImageBitmap` rather than `new Image()`: it
- * decodes off the main thread and reports HTTP failures as rejections, so a
- * missing texture is a catchable error instead of a silently blank surface.
+ * Vše jde přes `createImageBitmap` místo `new Image()`: dekóduje mimo hlavní
+ * vlákno a chyby HTTP hlásí jako zamítnutí (rejection), takže chybějící textura
+ * je zachytitelná chyba místo tiše prázdného povrchu.
  */
 
 export async function loadImageBitmap(url: string): Promise<ImageBitmap> {
@@ -12,9 +12,9 @@ export async function loadImageBitmap(url: string): Promise<ImageBitmap> {
     throw new Error(`Failed to load ${url}: HTTP ${response.status}`);
   }
 
-  // Vite's dev server answers unknown paths with 200 and an HTML page, so a
-  // mistyped filename arrives here looking like a success. Without this check
-  // the failure surfaces much later as an opaque decode error.
+  // Vite dev server odpovídá na neznámé cesty kódem 200 a HTML stránkou, takže
+  // překlep v názvu souboru sem dorazí jako úspěch. Bez této kontroly se chyba
+  // projeví až mnohem později jako nejasná chyba dekódování.
   const type = response.headers.get('content-type') ?? '';
   if (!type.startsWith('image/')) {
     throw new Error(`Failed to load ${url}: expected an image, got "${type}"`);
@@ -35,10 +35,10 @@ function createCanvas(width: number, height: number): CanvasRenderingContext2D {
 }
 
 /**
- * Rescales an image onto a canvas of exactly `width` x `height`.
+ * Přeškáluje obrázek na canvas o rozměrech přesně `width` x `height`.
  *
- * Every layer of a texture array must share one size, so incoming art is
- * normalised here rather than at the call site.
+ * Všechny vrstvy texture array musí mít stejnou velikost, takže příchozí grafika
+ * se normalizuje zde, a ne v místě volání.
  */
 export function rasterise(source: ImageBitmap, width: number, height = width): HTMLCanvasElement {
   const ctx = createCanvas(width, height);
@@ -48,14 +48,14 @@ export function rasterise(source: ImageBitmap, width: number, height = width): H
   return ctx.canvas;
 }
 
-/** Full-resolution pixel data, for CPU-side resampling. */
+/** Pixelová data v plném rozlišení pro převzorkování na CPU. */
 export function readPixels(source: ImageBitmap): ImageData {
   const ctx = createCanvas(source.width, source.height);
   ctx.drawImage(source, 0, 0);
   return ctx.getImageData(0, 0, source.width, source.height);
 }
 
-/** Bilinear sample of `image` at normalised (u, v), wrapping horizontally. */
+/** Bilineární vzorek `image` v normalizovaných (u, v), vodorovně opakovaný. */
 export function sampleBilinear(
   image: ImageData,
   u: number,
@@ -70,7 +70,7 @@ export function sampleBilinear(
   const fx = x - x0;
   const fy = y - y0;
 
-  // Panoramas wrap in longitude but clamp at the poles.
+  // Panoramata se v zeměpisné délce opakují, ale u pólů se ořezávají.
   const wrapX = (n: number): number => ((n % image.width) + image.width) % image.width;
   const clampY = (n: number): number => Math.min(Math.max(n, 0), image.height - 1);
 

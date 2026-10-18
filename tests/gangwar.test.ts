@@ -71,7 +71,7 @@ describe('Gangster', () => {
     const rng = createRng(1);
     const gangster = new Gangster(block.sidewalk, block.plot, rng, world);
     const { x, z } = gangster.body;
-    // Standing on the same sidewalk, a few metres off.
+    // Stojí na stejném chodníku, pár metrů opodál.
     const player: Target = {
       position: { x: x + 0.01, y: 1.7, z: z + 6 },
       alive: true,
@@ -123,7 +123,7 @@ describe('GangWar', () => {
     district.gangsters.forEach((g, i) => {
       const { x, z } = g.body;
       const y = i === 0 ? 1.55 : 1;
-      // Point blank, three body shots or one to the head.
+      // Zblízka tři zásahy do těla, nebo jeden do hlavy.
       for (let s = 0; s < 3 && g.alive; s++) {
         war.shoot({ x: x - 3, y, z }, { x: 1, y: 0, z: 0 }, open);
       }

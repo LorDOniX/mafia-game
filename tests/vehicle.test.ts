@@ -43,7 +43,7 @@ describe('fitVehicle', () => {
   });
 
   it('turns the model nose (+Z) onto the heading', () => {
-    // Heading pi/2 faces +X.
+    // Natočení pi/2 míří na +X.
     const vehicle = new Vehicle(fit.body, 0, 0, Math.PI / 2);
     const transform = vehicleTransform(vehicle, fit);
     const nose = transformPoint(transform, { ...fit.origin, z: fit.origin.z + 1 });
@@ -58,7 +58,7 @@ describe('fitVehicle', () => {
     const pose = vehiclePose(vehicle, config);
 
     expect(pose('body')).toBeNull();
-    // Wheel nose (+Z) turns toward the model's right, which is -X.
+    // Předek kola (+Z) se stáčí k pravé straně modelu, což je -X.
     expect(
       transformPoint(pose('wheel-front-left') ?? new Float32Array(16), { x: 0, y: 0, z: 1 }).x,
     ).toBeLessThan(0);
@@ -108,7 +108,7 @@ describe('Vehicle', () => {
   });
 
   it('stops at a wall instead of driving through it', () => {
-    // A wall across the road 20 m ahead.
+    // Zeď přes silnici 20 m vpředu.
     const wall: VehicleWorld = {
       blocked: (_x, z, radius) => z - radius < -20,
       groundHeightAt: () => 0,
@@ -121,7 +121,7 @@ describe('Vehicle', () => {
   });
 
   it('reverses out after driving into a wall at an angle', () => {
-    // A building face along x = 0, the car angled into it from the right.
+    // Stěna budovy podél x = 0, auto do ní najíždí šikmo zprava.
     const wall: VehicleWorld = {
       blocked: (x, _z, radius) => x - radius < 0,
       groundHeightAt: () => 0,

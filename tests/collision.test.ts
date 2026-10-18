@@ -24,7 +24,7 @@ describe('CityCollision.overlaps', () => {
   });
 
   it('leaves the middle of the road clear', () => {
-    // Whole multiples of the pitch fall on street centrelines.
+    // Celé násobky rozteče leží na osách ulic.
     expect(collision.overlaps(city.pitch, city.pitch * 2, RADIUS)).toBe(false);
   });
 
@@ -32,7 +32,7 @@ describe('CityCollision.overlaps', () => {
     const footprint = city.buildings[0]?.footprint;
     if (!footprint) throw new Error('expected at least one building');
 
-    // Just outside the wall, but close enough that the circle still clips it.
+    // Těsně za zdí, ale dost blízko na to, aby do ní kruh stále zasahoval.
     const x = footprint.minX - RADIUS / 2;
     const z = (footprint.minZ + footprint.maxZ) / 2;
 
@@ -60,7 +60,7 @@ describe('CityCollision.resolve', () => {
     const startX = footprint.minX - 1;
     const startZ = (footprint.minZ + footprint.maxZ) / 2;
 
-    // Pushing diagonally into the wall should still make progress along Z.
+    // Tlačení šikmo do zdi by mělo stále postupovat podél Z.
     const result = collision.resolve(startX, startZ, startX + 2, startZ + 2, RADIUS);
 
     expect(result.x).toBeLessThan(footprint.minX);

@@ -21,135 +21,135 @@ import type { AnimalSpecies } from '@/animals/animal';
 import { normalize, type Vec3 } from '@/math/vec3';
 
 /**
- * Where the city gets its art.
+ * Odkud město bere svou grafiku.
  *
- * This is the only file you need to touch to swap procedural textures for
- * downloaded PNGs. Put the files in `public/`, which Vite serves verbatim, and
- * reference them by absolute path — `public/textures/brick.png` is
- * `/textures/brick.png` at runtime. Do not import them from `src/`: that route
- * hashes the filename, which is pointless for art you address by name.
+ * Toto je jediný soubor, na který je třeba sáhnout při záměně procedurálních textur
+ * za stažená PNG. Soubory dejte do `public/`, který Vite servíruje beze změny,
+ * a odkazujte na ně absolutní cestou — `public/textures/brick.png` je za běhu
+ * `/textures/brick.png`. Neimportujte je ze `src/`: tato cesta přidá do názvu
+ * souboru hash, což nemá smysl u grafiky, na kterou se odkazujete jménem.
  *
- * Any layer left out falls back to its procedural texture, and a URL that fails
- * to load warns and falls back too, so a typo degrades instead of breaking.
+ * Každá vynechaná vrstva se vrátí ke své procedurální textuře a URL, které se
+ * nepodaří načíst, vypíše varování a také se vrátí, takže překlep zhorší výsledek
+ * místo toho, aby něco rozbil.
  */
 export const SURFACE_TEXTURES: Partial<Record<TextureLayer, string>> = {
-  // ambientCG "Road008B" (CC0). This layer is mapped across the width of a
-  // street, so its texture must be a road cross-section: kerb lines on the two
-  // vertical edges, centre line down the middle. A plain asphalt swatch here
-  // would work but would leave the city unmarked.
+  // ambientCG "Road008B" (CC0). Tato vrstva se mapuje přes šířku ulice, takže
+  // její textura musí být příčný řez vozovkou: čáry obrubníků na obou svislých
+  // okrajích, středová čára uprostřed. Obyčejný vzorek asfaltu by tu fungoval,
+  // ale město by zůstalo bez značení.
   [TextureLayer.Road]: '/textures/road/Road008B_1K-JPG_Color.jpg',
-  // Freely tiled, so this one wants a seamless swatch with nothing painted on
-  // it. Only the outskirts and the map-edge streets show it.
+  // Volně dlaždicovaná, takže potřebuje bezšvý vzorek bez jakéhokoli značení.
+  // Ukazuje se jen na okrajích města a v ulicích na okraji mapy.
   // [TextureLayer.Asphalt]: '/textures/asphalt.png',
   // [TextureLayer.Sidewalk]: '/textures/pavement.png',
   // [TextureLayer.Cobble]: '/textures/cobblestone.png',
   // [TextureLayer.Brick]: '/textures/brick.png',
   // [TextureLayer.Plaster]: '/textures/plaster.png',
   // [TextureLayer.Roof]: '/textures/roof.png',
-  // Park lawns, tiled freely; e.g. an ambientCG "Grass" swatch.
+  // Trávníky v parcích, volně dlaždicované; např. vzorek ambientCG "Grass".
   [TextureLayer.Grass]: '/textures/park/grass.png',
 };
 
 /**
- * Tangent-space normal maps, keyed the same way as `SURFACE_TEXTURES`.
+ * Normal mapy v tangent space, s klíči stejnými jako `SURFACE_TEXTURES`.
  *
- * Use the **OpenGL** convention, where green points up (+Y). Packs that ship
- * both variants label them `NormalGL` and `NormalDX`; the DirectX one has its
- * green channel inverted and would light every bump from the wrong side.
+ * Použijte konvenci **OpenGL**, kde zelená míří nahoru (+Y). Balíčky, které
+ * dodávají obě varianty, je označují `NormalGL` a `NormalDX`; varianta DirectX má
+ * invertovaný zelený kanál a osvětlila by každý hrbol z opačné strany.
  *
- * Layers with no entry get a flat normal and shade exactly as before.
+ * Vrstvy bez záznamu dostanou plochou normálu a stínují se přesně jako dřív.
  */
 export const SURFACE_NORMAL_MAPS: Partial<Record<TextureLayer, string>> = {
   [TextureLayer.Road]: '/textures/road/Road008B_1K-JPG_NormalGL.jpg',
 };
 
 /**
- * Global multiplier on normal-map strength. 1 is the map as authored, 0 falls
- * back to flat geometric normals. Asphalt maps tend to be aggressive, and the
- * roadway is viewed at grazing angles where strong normals read as noise.
+ * Globální násobitel síly normal mapy. 1 je mapa tak, jak byla vytvořena, 0 se
+ * vrací k plochým geometrickým normálám. Mapy asfaltu bývají agresivní a vozovka
+ * je vidět pod šikmými úhly, kde silné normály působí jako šum.
  */
 export const NORMAL_STRENGTH = 0.6;
 
 /**
- * Whether to paint the procedural window over loaded facade textures.
+ * Zda kreslit procedurální okno přes načtené textury fasád.
  *
- * Leave this on unless your facade art already contains windows: the mesh maps
- * one tile to one storey and one window bay, so a plain wall photo would
- * otherwise tile into a blank cliff.
+ * Nechte zapnuté, pokud vaše grafika fasád už okna neobsahuje: mesh mapuje
+ * jednu dlaždici na jedno podlaží a jednu okenní osu, takže prostá fotka zdi
+ * by se jinak opakovala do prázdné stěny.
  */
 export const OVERLAY_WINDOWS_ON_FACADES = true;
 
 /**
- * Facades of your own, for individual buildings or groups of them.
+ * Vlastní fasády pro jednotlivé budovy nebo jejich skupiny.
  *
- * Each entry gets its own texture layer and goes on the buildings its targets
- * pick; everything else keeps the built-in brick and stucco. Add entries to
- * add facades — nothing else needs touching. See `CustomFacade` in
- * `city/facades.ts` for the fields, and the README for how to prepare images.
+ * Každý záznam dostane vlastní vrstvu textury a použije se na budovy, které
+ * vyberou jeho cíle; vše ostatní si ponechá vestavěnou cihlu a štuk. Fasády
+ * přidáte přidáním záznamů — na nic dalšího sahat netřeba. Pole popisuje
+ * `CustomFacade` v `city/facades.ts`, přípravu obrázků README.
  */
 export const CUSTOM_FACADES: readonly CustomFacade[] = [
   {
-    // Granite-clad block, cropped to exactly 9 x 7 window bays so it tiles.
-    // Source photo in assets-src/textures/facades/.
+    // Blok obložený žulou, oříznutý přesně na 9 x 7 okenních os, aby se dlaždicoval.
+    // Zdrojová fotka je v assets-src/textures/facades/.
     name: 'granite-grid',
     url: '/textures/facades/granite-grid.jpg',
     span: { bays: 9, storeys: 7 },
     targets: [
-      // The corner block ahead and to the right of the spawn point.
+      // Nárožní blok vpředu a vpravo od místa spawnu.
       { at: { x: 328, z: 327 } },
     ],
   },
   {
-    // Granite-clad block, cropped to exactly 9 x 7 window bays so it tiles.
-    // Source photo in assets-src/textures/facades/.
+    // Blok obložený žulou, oříznutý přesně na 9 x 7 okenních os, aby se dlaždicoval.
+    // Zdrojová fotka je v assets-src/textures/facades/.
     name: 'granite-grid',
     url: '/textures/facades/granite-grid.jpg',
     span: { bays: 9, storeys: 7 },
     targets: [
-      // The corner block ahead and to the right of the spawn point.
+      // Nárožní blok vpředu a vpravo od místa spawnu.
       { at: { x: 248, z: 325 } },
     ],
   },
 ];
 
 /**
- * The drivable car.
+ * Řiditelné auto.
  *
- * A binary glTF (.glb) facing +Z, with Y up. Textures it references by
- * relative path are resolved against the model file, so keep the folder
- * layout the model shipped with: Kenney's kit expects `Textures/colormap.png`
- * next to the .glb. Size, wheelbase and wheel radius are measured off the
- * model; `scale` converts its units to metres. See `VehicleModelConfig` for
- * how wheels are found.
+ * Binární glTF (.glb) natočený k +Z, s osou Y nahoru. Textury, na které odkazuje
+ * relativní cestou, se hledají vůči souboru modelu, takže zachovejte strukturu
+ * složek, se kterou model přišel: Kenneyho kit očekává `Textures/colormap.png`
+ * vedle .glb. Rozměry, rozvor a poloměr kol se měří z modelu; `scale` převádí
+ * jeho jednotky na metry. Jak se hledají kola, popisuje `VehicleModelConfig`.
  */
 export const VEHICLE: VehicleModelConfig = {
-  // Kenney "Car Kit" (CC0). Licence and preview in assets-src/models/.
+  // Kenney "Car Kit" (CC0). Licence a náhled v assets-src/models/.
   url: '/models/ambulance.glb',
   scale: 1.4,
   spinPrefix: 'wheel-',
   steerPrefix: 'wheel-front',
 };
 
-/** A car in city traffic, from the Kenney "Car Kit" in public/models-car/. */
+/** Auto v městském provozu, z Kenney "Car Kit" v public/models-car/. */
 export interface TrafficCarModel {
   url: string;
-  /** Relative odds of a car being this model. */
+  /** Relativní šance, že auto bude tímto modelem. */
   weight: number;
-  /** Its colour on the minimap. */
+  /** Jeho barva na minimapě. */
   mapColor: string;
 }
 
 const CAR_KIT = { scale: 1.4, spinPrefix: 'wheel-', steerPrefix: 'wheel-front' };
 
-/** Turns a traffic model into the config `fitVehicle` and `vehiclePose` take. */
+/** Převede model z provozu na konfiguraci, kterou berou `fitVehicle` a `vehiclePose`. */
 export const trafficVehicleConfig = (model: TrafficCarModel): VehicleModelConfig => ({
   url: model.url,
   ...CAR_KIT,
 });
 
 /**
- * Everyday street traffic. Karts, racers and tractors stay in the kit; so does
- * the SUV, whose spare wheel on the tailgate would spin with the rest.
+ * Běžný pouliční provoz. Motokáry, závodní auta a traktory zůstávají v kitu; stejně
+ * tak SUV, jehož rezervní kolo na zadních dveřích by se točilo s ostatními.
  */
 export const TRAFFIC_CARS: readonly TrafficCarModel[] = [
   { url: '/models-car/sedan.glb', weight: 6, mapColor: '#d6d2c8' },
@@ -168,29 +168,29 @@ export const TRAFFIC_CARS: readonly TrafficCarModel[] = [
   { url: '/models-car/firetruck.glb', weight: 0.3, mapColor: '#d8483a' },
 ];
 
-/** Cars driving around town at once. */
+/** Auta jezdící po městě najednou. */
 export const TRAFFIC_COUNT = 100;
 
-/** The rival gang: Kenney "Blocky Characters" (CC0), one picked at random per gangster. */
+/** Soupeřící gang: Kenney "Blocky Characters" (CC0), pro každého gangstera jeden náhodně. */
 export const GANGSTER_MODELS: readonly string[] = 'abcdefghijklmnopqr'
   .split('')
   .map((letter) => `/models-people/character-${letter}.glb`);
 
-/** Everyone's pistol: Kenney "Blaster Kit" (CC0). */
+/** Pistole pro všechny: Kenney "Blaster Kit" (CC0). */
 export const PISTOL_MODEL = {
   url: '/models-weapons/blaster-b.glb',
-  /** Model units to metres. */
+  /** Převod jednotek modelu na metry. */
   scale: 0.5,
-  /** +1 if the barrel points down the model's +Z, -1 for -Z. */
+  /** +1, pokud hlaveň míří po +Z modelu, -1 pro -Z. */
   forward: -1,
 };
 
 /**
- * Tree species: a model and the height it should stand, in metres. Width
- * follows from the model's proportions.
+ * Druhy stromů: model a výška, kterou má strom mít, v metrech. Šířka plyne
+ * z proporcí modelu.
  *
- * Kenney "Nature Kit" (CC0). Each tree is two coloured materials, crown and
- * trunk, with no texture.
+ * Kenney "Nature Kit" (CC0). Každý strom tvoří dva barevné materiály, koruna
+ * a kmen, bez textury.
  */
 export const TREE_MODELS = {
   oak: { url: '/models/tree_oak.glb', height: 8 },
@@ -200,15 +200,15 @@ export const TREE_MODELS = {
 
 export type TreeSpecies = keyof typeof TREE_MODELS;
 
-/** Sidewalks and squares. One species per side of a street, picked from here. */
+/** Chodníky a náměstí. Jeden druh na každou stranu ulice, vybraný odsud. */
 export const STREET_TREES: readonly TreeSpecies[] = ['oak'];
-/** Parks, mixed tree by tree; repeat an entry to make it more common. */
+/** Parky, smíšené strom po stromu; zopakováním záznamu bude druh častější. */
 export const PARK_TREES: readonly TreeSpecies[] = ['oak', 'oak', 'pine', 'smallPine'];
 
 /**
- * Park animals: Kenney "Cube Pets" (CC0), standing `height` metres tall.
- * Flyers circle above the park; everything else wanders the lawn.
- * The fish is in the kit too, but left out: it would only flop about.
+ * Zvířata v parcích: Kenney "Cube Pets" (CC0), vysoká `height` metrů.
+ * Létající krouží nad parkem; všechna ostatní se toulají po trávníku.
+ * Ryba v kitu také je, ale je vynechaná: jen by se plácala sem a tam.
  */
 export const ANIMALS: readonly AnimalSpecies[] = [
   { url: '/models-animals/animal-beaver.glb', height: 0.6 },
@@ -236,10 +236,10 @@ export const ANIMALS: readonly AnimalSpecies[] = [
   { url: '/models-animals/animal-tiger.glb', height: 1.2 },
 ];
 
-/** How many animals each park gets, inclusive. */
+/** Kolik zvířat dostane každý park, včetně mezí. */
 export const ANIMALS_PER_PARK = { min: 3, max: 7 };
 
-/** A model, or null if it fails to load: the city still works without it. */
+/** Model, nebo null, pokud se nepodaří načíst: město funguje i bez něj. */
 export async function loadOptionalModel(url: string): Promise<LoadedModel | null> {
   try {
     return await loadModel(url);
@@ -251,25 +251,25 @@ export async function loadOptionalModel(url: string): Promise<LoadedModel | null
 
 export type SkySource =
   | { kind: 'procedural' }
-  /** Six cube faces in GL order: +X, -X, +Y, -Y, +Z, -Z. */
+  /** Šest stěn krychle v pořadí GL: +X, -X, +Y, -Y, +Z, -Z. */
   | { kind: 'faces'; urls: readonly string[]; sunDirection: Vec3; horizonColor: RGB }
-  /** A single equirectangular panorama, resampled into cube faces on load. */
+  /** Jediné ekvirektangulární panorama, při načtení převzorkované do stěn krychle. */
   | { kind: 'panorama'; url: string; sunDirection: Vec3; horizonColor: RGB };
 
 export type RGB = readonly [number, number, number];
 
 /**
- * The sky, and the lighting that has to agree with it.
+ * Obloha a osvětlení, které s ní musí souhlasit.
  *
- * `sunDirection` and `horizonColor` travel with the sky on purpose: the city's
- * shading and its distance fog are keyed off them, so a photographic sky whose
- * sun sits somewhere else will look wrong until these match it. Point
- * `sunDirection` from the ground toward the sun, and sample `horizonColor`
- * straight off the image at eye level.
+ * `sunDirection` a `horizonColor` jsou s oblohou svázány záměrně: stínování města
+ * a jeho vzdálenostní mlha se od nich odvíjejí, takže fotografická obloha se
+ * sluncem jinde bude vypadat špatně, dokud jí tyto hodnoty neodpovídají. Nasměrujte
+ * `sunDirection` od země ke slunci a `horizonColor` odečtěte přímo z obrázku
+ * ve výšce očí.
  */
 export const SKY: SkySource = { kind: 'procedural' };
 
-// Example, using a Poly Haven panorama saved as public/sky/afternoon.jpg:
+// Příklad s panoramatem z Poly Haven uloženým jako public/sky/afternoon.jpg:
 //
 // export const SKY: SkySource = {
 //   kind: 'panorama',
@@ -285,9 +285,9 @@ export interface ResolvedSky {
 }
 
 export interface CityAssets {
-  /** One canvas per TextureLayer, then one per custom facade, all TEXTURE_SIZE square. */
+  /** Jeden canvas na TextureLayer, pak jeden na vlastní fasádu, vše čtverce TEXTURE_SIZE. */
   surfaces: HTMLCanvasElement[];
-  /** Matching normal maps, flat where a layer has none. */
+  /** Odpovídající normal mapy, ploché tam, kde vrstva žádnou nemá. */
   normals: HTMLCanvasElement[];
   sky: ResolvedSky;
 }
@@ -304,10 +304,10 @@ export async function loadCityAssets(): Promise<CityAssets> {
 const KNOWN_LAYERS = new Set<number>(Object.values(TextureLayer));
 
 /**
- * Manifest entries with their keys back as numbers.
+ * Záznamy manifestu s klíči převedenými zpět na čísla.
  *
- * Object keys stringify, so an entry that is not a real layer would otherwise
- * land on NaN and silently do nothing.
+ * Klíče objektu se převádějí na řetězce, takže záznam, který není skutečnou
+ * vrstvou, by jinak skončil na NaN a tiše by nedělal nic.
  */
 function layerEntries(
   manifest: Partial<Record<TextureLayer, string>>,
@@ -326,7 +326,7 @@ function layerEntries(
 
 async function loadSurfaceTextures(): Promise<HTMLCanvasElement[]> {
   const surfaces = createSurfaceTextures();
-  // Taken before any override lands, as the stand-in for custom facades.
+  // Vezme se dřív, než se uplatní jakékoli přepsání, jako náhrada pro vlastní fasády.
   const plaster = surfaces[TextureLayer.Plaster];
   if (!plaster) throw new Error('Procedural plaster texture missing');
 
@@ -355,10 +355,10 @@ async function loadSurfaceTextures(): Promise<HTMLCanvasElement[]> {
 }
 
 async function loadNormalMaps(): Promise<HTMLCanvasElement[]> {
-  // One flat canvas, shared by every layer without a map of its own: the
-  // upload reads it per layer, so there is no need for six copies.
+  // Jeden plochý canvas sdílený všemi vrstvami bez vlastní mapy: upload ho
+  // čte pro každou vrstvu zvlášť, takže není potřeba šest kopií.
   const flat = createFlatNormalMap();
-  // Custom facades included, so both arrays have the same depth.
+  // Včetně vlastních fasád, aby obě pole měla stejnou hloubku.
   const normals = [...Object.values(TextureLayer), ...CUSTOM_FACADES].map(() => flat);
 
   await Promise.all([

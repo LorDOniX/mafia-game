@@ -13,36 +13,36 @@ import {
 
 export interface AnimalSpecies {
   url: string;
-  /** Standing height, metres. */
+  /** Výška ve stoje, metry. */
   height: number;
   flies?: boolean;
 }
 
-/** What an animal needs from the world: whether a spot is blocked by a trunk or post. */
+/** Co zvíře potřebuje od světa: zda místo blokuje kmen nebo sloup. */
 export interface AnimalWorld {
   overlaps(x: number, z: number, radius: number): boolean;
 }
 
-/** How a species' model is sized and stood on the ground; shared by every animal of it. */
+/** Jak se model druhu zmenší/zvětší a postaví na zem; sdílí ho všechna zvířata druhu. */
 export interface AnimalFit {
   scale: number;
-  /** Model-space height of the feet, lifted to zero. */
+  /** Výška chodidel v prostoru modelu, zvednutá na nulu. */
   lift: number;
 }
 
-/** Walking pace grows with size, so an elephant out-strides a bunny. */
+/** Rychlost chůze roste s velikostí, takže slon kráčí rychleji než zajíc. */
 const WALK_SPEED_BASE = 0.5;
 const WALK_SPEED_PER_METRE = 0.6;
 const FLY_SPEED = 3;
-/** Radians per second. */
+/** Radiány za sekundu. */
 const TURN_RATE = 3;
-/** Kept between an animal and the edge of its park, metres. */
+/** Odstup zvířete od okraje jeho parku, metry. */
 const EDGE_MARGIN = 2;
 const FLY_ALTITUDE = { min: 2.5, max: 8 };
 const IDLE_SECONDS = { min: 1, max: 5 };
 const LEG_SWING = 0.6;
 const WING_FLAP = 0.7;
-/** Wing beats per second, in radians of phase. */
+/** Mávnutí křídel za sekundu, v radiánech fáze. */
 const FLAP_RATE = 18;
 
 export function fitAnimal(model: ModelData, height: number): AnimalFit {
@@ -51,15 +51,15 @@ export function fitAnimal(model: ModelData, height: number): AnimalFit {
 }
 
 /**
- * An animal wandering a park: it picks a spot, turns and walks (or flies) to
- * it, pauses, and picks another. Every target lies inside its park, and every
- * step is clamped to it too, so nothing ever strays into the street.
+ * Zvíře toulající se po parku: vybere si místo, otočí se a dojde (nebo doletí)
+ * k němu, zastaví se a vybere si další. Každý cíl leží uvnitř parku a každý
+ * krok je do něj také ořezaný, takže nic nikdy nezabloudí do ulice.
  */
 export class Animal {
   x: number;
   z: number;
   y: number;
-  /** Model +Z points along (sin, cos) of this, as `rotationY` turns it. */
+  /** +Z modelu míří podél (sin, cos) této hodnoty, jak ho otáčí `rotationY`. */
   heading: number;
   moving = false;
 
@@ -114,7 +114,7 @@ export class Animal {
         const turn = wrapAngle(Math.atan2(dx, dz) - this.heading);
         this.heading += Math.max(-TURN_RATE * dt, Math.min(TURN_RATE * dt, turn));
 
-        // Walk only once roughly facing the way, so animals turn on the spot.
+        // Jít až při zhruba správném natočení, takže se zvířata otáčejí na místě.
         const step = Math.min(this.speed * dt, distance) * Math.max(Math.cos(turn), 0);
         const { minX, maxX, minZ, maxZ } = this.inner();
         const nx = clamp(this.x + Math.sin(this.heading) * step, minX, maxX);
@@ -137,14 +137,14 @@ export class Animal {
     if (this.moving) this.stride += (dt * this.speed * 4) / Math.max(this.species.height, 0.2);
   }
 
-  /** Model-to-world, with a gentle bob while flying. */
+  /** Z modelu do světa, s mírným pohupováním za letu. */
   transform(fit: AnimalFit): Mat4 {
     const bob = this.species.flies ? Math.sin(this.flap * 0.15) * 0.15 : 0;
     const placed = multiply(translate(this.x, this.y + bob, this.z), rotationY(this.heading));
     return multiply(multiply(placed, scaling(fit.scale)), translate(0, fit.lift, 0));
   }
 
-  /** Legs swing in diagonal pairs while walking; wings beat while flying. */
+  /** Při chůzi se nohy kývají v diagonálních párech; za letu mávají křídla. */
   pose(): (part: string) => Mat4 | null {
     const walking = this.moving && !this.species.flies;
     const swing = Math.sin(this.stride) * LEG_SWING;

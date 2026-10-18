@@ -13,16 +13,16 @@ import type { SpotLight } from '@/gfx/lights';
 import type { Vehicle, VehicleBody } from './vehicle';
 
 /**
- * How a glTF model becomes a drivable car.
+ * Jak se z glTF modelu stane řiditelné auto.
  *
- * The model is expected to face +Z with +Y up, the glTF convention, and to
- * name its wheels so they can be found: every part whose name starts with
- * `spinPrefix` rolls, and those also starting with `steerPrefix` steer.
- * Kenney's car kit names them `wheel-front-left`, `wheel-back-right` and so on.
+ * Očekává se, že model míří na +Z s +Y nahoru, podle konvence glTF, a že kola
+ * pojmenovává tak, aby šla najít: každá část, jejíž název začíná na
+ * `spinPrefix`, se točí, a ty, které začínají i na `steerPrefix`, zatáčejí.
+ * Kenneyho car kit je pojmenovává `wheel-front-left`, `wheel-back-right` atd.
  */
 export interface VehicleModelConfig {
   url: string;
-  /** Uniform scale from model units to metres. */
+  /** Jednotné měřítko z jednotek modelu na metry. */
   scale: number;
   spinPrefix: string;
   steerPrefix: string;
@@ -30,18 +30,18 @@ export interface VehicleModelConfig {
 
 export interface VehicleFit {
   body: VehicleBody;
-  /** Model-space point that sits on the vehicle's position: footprint centre, at ground level. */
+  /** Bod v prostoru modelu, který leží na pozici vozidla: střed půdorysu, na úrovni země. */
   origin: Vec3;
   scale: number;
 }
 
-/** Wheel radius and wheelbase to fall back on when a model has no named wheels. */
+/** Poloměr kola a rozvor pro případ, že model nemá pojmenovaná kola. */
 const FALLBACK_WHEEL_RADIUS = 0.35;
 const FALLBACK_WHEELBASE_RATIO = 0.6;
 
 /**
- * Measures the car off its model: size from the bounds of every part, wheel
- * radius from the wheel geometry, and wheelbase from where the axles sit.
+ * Změří auto podle jeho modelu: velikost z obálek všech částí, poloměr kola
+ * z geometrie kol a rozvor z polohy náprav.
  */
 export function fitVehicle(data: ModelData, config: VehicleModelConfig): VehicleFit {
   const min = { x: Infinity, y: Infinity, z: Infinity };
@@ -67,7 +67,7 @@ export function fitVehicle(data: ModelData, config: VehicleModelConfig): Vehicle
   const front = wheels.filter((part) => part.name.startsWith(steerPrefix));
   const rear = wheels.filter((part) => !part.name.startsWith(steerPrefix));
 
-  // Node translation is the axle, since that is what the wheel spins around.
+  // Posun uzlu je náprava, protože kolem ní se kolo točí.
   const axleZ = (parts: typeof wheels): number =>
     parts.reduce((sum, part) => sum + (part.matrix[14] ?? 0), 0) / parts.length;
 
@@ -87,10 +87,10 @@ export function fitVehicle(data: ModelData, config: VehicleModelConfig): Vehicle
 }
 
 /**
- * Model-to-world transform for a vehicle.
+ * Transformace z modelu do světa pro vozidlo.
  *
- * Rotating by pi - heading turns the model's +Z nose onto the heading's
- * forward vector (sin h, 0, -cos h).
+ * Rotace o pi - heading natočí příď modelu na +Z do dopředného vektoru
+ * headingu (sin h, 0, -cos h).
  */
 export function vehicleTransform(vehicle: Vehicle, fit: VehicleFit): Mat4 {
   const { origin, scale } = fit;
@@ -102,7 +102,7 @@ export function vehicleTransform(vehicle: Vehicle, fit: VehicleFit): Mat4 {
   return multiply(sized, translate(-origin.x, -origin.y, -origin.z));
 }
 
-/** Per-part pose for the wheels: roll with distance travelled, steer at the front. */
+/** Póza kol po částech: točí se podle ujeté vzdálenosti, vpředu zatáčejí. */
 export function vehiclePose(
   vehicle: Vehicle,
   config: VehicleModelConfig,
@@ -113,25 +113,25 @@ export function vehiclePose(
     const roll = rotationX(vehicle.wheelSpin);
     if (!part.startsWith(config.steerPrefix)) return roll;
 
-    // The model's right is -X, so steering right turns the wheel's +Z nose
-    // toward -X: a negative angle about +Y.
+    // Pravá strana modelu je -X, takže zatočení vpravo natočí příď kola na +Z
+    // k -X: záporný úhel kolem +Y.
     return multiply(rotationY(-vehicle.steer), roll);
   };
 }
 
 const HEADLIGHT_HEIGHT = 0.7;
-/** Beams dip slightly so they light the road rather than the cars ahead. */
+/** Světla jsou mírně sklopená, aby svítila na silnici, ne na auta před sebou. */
 const HEADLIGHT_DIP = 0.05;
 const HEADLIGHT_COLOR: readonly [number, number, number] = [1.0, 0.94, 0.82];
 export const HEADLIGHT_INTENSITY = 220;
 export const HEADLIGHT_RANGE = 80;
-/** Half-angles, radians: a tight core that throws far, with a softer spill. */
+/** Poloviční úhly, radiány: úzké jádro, které svítí daleko, s měkčím rozptylem. */
 const HEADLIGHT_INNER = 0.15;
 const HEADLIGHT_OUTER = 0.4;
 
 /**
- * Both headlamps as one beam from the middle of the bonnet: half the cost in
- * the shader, and at a car's width apart the two would light the same patch.
+ * Oba světlomety jako jeden kužel ze středu kapoty: poloviční cena v shaderu,
+ * a při vzdálenosti šířky auta by oba stejně osvětlily totéž místo.
  */
 export function headlight(vehicle: Vehicle): SpotLight {
   const f = vehicle.forward();

@@ -2,31 +2,31 @@ import { createRng, type Rng } from '@/core/rng';
 import { TextureLayer } from './layout';
 
 /**
- * Edge length of every layer in the surface texture array.
+ * Délka hrany každé vrstvy texture array povrchů.
  *
- * All layers must match, so downloaded art is rescaled to this. Each layer
- * costs size^2 * 4 bytes plus a third again for mipmaps — about 21 MB at 2048 —
- * in each of the colour and normal arrays, for every built-in layer and every
- * custom facade. Drop it to 1024 if GPU memory is tight.
+ * Všechny vrstvy se musí shodovat, takže stažená grafika se na tuto velikost
+ * přeškáluje. Každá vrstva stojí size^2 * 4 bajtů plus další třetinu na mipmapy —
+ * zhruba 21 MB při 2048 — v barevném i normalovém poli, za každou vestavěnou vrstvu
+ * a každou vlastní fasádu. Při nedostatku paměti GPU snižte na 1024.
  */
 export const TEXTURE_SIZE = 2048;
 
 /**
- * Coordinate space the procedural art is drawn in.
+ * Souřadnicový prostor, ve kterém se kreslí procedurální grafika.
  *
- * Stroke widths, insets and blotch sizes below are in these units, and each
- * canvas is scaled from them up to TEXTURE_SIZE, so raising the resolution
- * sharpens the procedural textures rather than shrinking their detail.
+ * Šířky tahů, odsazení a velikosti skvrn níže jsou v těchto jednotkách a každé
+ * plátno se z nich škáluje na TEXTURE_SIZE, takže vyšší rozlišení procedurální
+ * textury zaostří, místo aby zmenšilo jejich detaily.
  */
 const ART_SIZE = 1024;
 
 /**
- * Every surface texture is drawn procedurally so the project needs no binary
- * assets. Each one tiles seamlessly: they are sampled with REPEAT and mipmaps,
- * so any seam would show up as a visible grid across the city.
+ * Všechny textury povrchů se kreslí procedurálně, takže projekt nepotřebuje žádné
+ * binární assety. Každá se dlažduce bez švů: vzorkují se s REPEAT a mipmapami,
+ * takže jakýkoli šev by se ukázal jako viditelná mřížka přes celé město.
  *
- * To move to authored art later, replace this function with image loading —
- * the renderer only needs one TEXTURE_SIZE canvas per layer.
+ * Pro pozdější přechod na ručně tvořenou grafiku nahraďte tuto funkci načítáním
+ * obrázků — renderer potřebuje jen jedno plátno TEXTURE_SIZE na vrstvu.
  */
 export function createSurfaceTextures(): HTMLCanvasElement[] {
   const textures: HTMLCanvasElement[] = [];
@@ -42,10 +42,10 @@ export function createSurfaceTextures(): HTMLCanvasElement[] {
 }
 
 /**
- * A flat tangent-space normal, (0, 0, 1) encoded into RGB.
+ * Plochá normála v tangent space, (0, 0, 1) zakódovaná do RGB.
  *
- * Layers with no normal map of their own get this, so the whole array can be
- * sampled unconditionally and the shader needs no per-layer branch.
+ * Dostanou ji vrstvy bez vlastní normal mapy, takže celé pole lze vzorkovat
+ * bezpodmínečně a shader nepotřebuje větvení podle vrstvy.
  */
 export function createFlatNormalMap(): HTMLCanvasElement {
   const { canvas, ctx } = createCanvas();
@@ -54,18 +54,18 @@ export function createFlatNormalMap(): HTMLCanvasElement {
   return canvas;
 }
 
-/** Window colours per facade layer: brick gets darker joinery than stucco. */
+/** Barvy oken podle vrstvy fasády: cihla má tmavší truhlářské prvky než omítka. */
 const FACADE_TRIM: Partial<Record<TextureLayer, { frame: string; sill: string }>> = {
   [TextureLayer.Brick]: { frame: '#2e2722', sill: '#6d675e' },
   [TextureLayer.Plaster]: { frame: '#494036', sill: '#8e887a' },
 };
 
 /**
- * Paints the procedural window over an existing facade tile, in place.
+ * Namaluje procedurální okno přes existující dlaždici fasády, na místě.
  *
- * Downloaded brick or stucco textures are plain walls, but the mesh maps one
- * tile to one storey and one window bay. Compositing the window on top keeps
- * that mapping meaningful, so a bare wall photo still reads as a facade.
+ * Stažené cihlové nebo omítkové textury jsou holé zdi, ale mesh mapuje jednu
+ * dlaždici na jedno podlaží a jednu okenní osu. Složení okna navrch udrží toto
+ * mapování smysluplné, takže i fotka holé zdi působí jako fasáda.
  */
 export function overlayFacadeWindow(canvas: HTMLCanvasElement, layer: TextureLayer): void {
   const trim = FACADE_TRIM[layer];
@@ -74,7 +74,7 @@ export function overlayFacadeWindow(canvas: HTMLCanvasElement, layer: TextureLay
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('2D canvas context unavailable — cannot overlay windows');
 
-  // Loaded canvases carry no transform, so map art units onto them here.
+  // Načtená plátna nemají žádnou transformaci, takže jednotky grafiky na ně mapujeme tady.
   ctx.save();
   ctx.scale(canvas.width / ART_SIZE, canvas.height / ART_SIZE);
   drawWindow(ctx, createRng(layer + 1), trim.frame, trim.sill);
@@ -82,11 +82,11 @@ export function overlayFacadeWindow(canvas: HTMLCanvasElement, layer: TextureLay
 }
 
 /**
- * Repeats a one-bay facade tile across a `bays` x `storeys` grid.
+ * Opakuje dlaždici fasády s jednou osou přes mřížku `bays` x `storeys`.
  *
- * A custom facade's layer is mapped as a whole multi-bay wall, so when its
- * image fails to load, the stand-in has to be laid out the same way or one
- * window would be stretched across several bays.
+ * Vrstva vlastní fasády se mapuje jako celá víceosová stěna, takže když se její
+ * obrázek nepodaří načíst, náhrada musí být rozvržená stejně, jinak by se jedno
+ * okno roztáhlo přes několik os.
  */
 export function repeatFacadeTile(
   tile: HTMLCanvasElement,
@@ -119,12 +119,12 @@ function createCanvas(): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContex
 }
 
 /**
- * Monochrome grain, one speck per art unit. Cheap way to stop flat fills
- * looking plastic.
+ * Jednobarevné zrno, jedna tečka na jednotku grafiky. Levný způsob, jak zabránit
+ * plastovému vzhledu plochých výplní.
  *
- * Pixel access ignores the canvas transform, so the grain is laid out in art
- * units by hand. That keeps the speck size, and the RNG sequence that drives
- * it, independent of TEXTURE_SIZE.
+ * Přístup k pixelům ignoruje transformaci plátna, takže zrno se rozvádí v jednotkách
+ * grafiky ručně. Velikost tečky i sekvence RNG, která ji řídí, tak zůstávají
+ * nezávislé na TEXTURE_SIZE.
  */
 function addGrain(ctx: CanvasRenderingContext2D, rng: Rng, amount: number): void {
   const { width, height } = ctx.canvas;
@@ -151,7 +151,7 @@ function addGrain(ctx: CanvasRenderingContext2D, rng: Rng, amount: number): void
 
 const clampByte = (v: number): number => (v < 0 ? 0 : v > 255 ? 255 : v);
 
-/** Draws a rect, repeating it across the wrap edges so the tile stays seamless. */
+/** Nakreslí obdélník a zopakuje ho přes okraje, aby dlaždice zůstala bez švů. */
 function fillWrapped(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -175,14 +175,14 @@ function drawGrass(): HTMLCanvasElement {
   ctx.fillStyle = '#4c6a32';
   ctx.fillRect(0, 0, ART_SIZE, ART_SIZE);
 
-  // Drawn at every wrap offset, so blotches crossing an edge stay seamless.
+  // Kreslí se s každým posunem přes okraj, takže skvrny přes hranu zůstávají bez švů.
   const wrapped = (draw: (dx: number, dy: number) => void): void => {
     for (const dx of [0, -ART_SIZE, ART_SIZE]) {
       for (const dy of [0, -ART_SIZE, ART_SIZE]) draw(dx, dy);
     }
   };
 
-  // Patchy lawn: drier and lusher areas.
+  // Flekovitý trávník: sušší a bujnější místa.
   for (let i = 0; i < 60; i++) {
     const x = rng.range(0, ART_SIZE);
     const y = rng.range(0, ART_SIZE);
@@ -198,7 +198,7 @@ function drawGrass(): HTMLCanvasElement {
     });
   }
 
-  // Blades, short strokes in light and dark greens.
+  // Stébla, krátké tahy ve světlých a tmavých odstínech zelené.
   ctx.lineWidth = 1.4;
   for (let i = 0; i < 9000; i++) {
     const x = rng.range(0, ART_SIZE);
@@ -227,7 +227,7 @@ function drawAsphalt(): HTMLCanvasElement {
   ctx.fillStyle = '#3b3b40';
   ctx.fillRect(0, 0, ART_SIZE, ART_SIZE);
 
-  // Worn patches where the surface has been resealed.
+  // Opotřebené záplaty, kde byl povrch znovu utěsněn.
   for (let i = 0; i < 26; i++) {
     const shade = Math.floor(rng.range(52, 78));
     ctx.fillStyle = `rgba(${shade},${shade},${shade + 4},0.5)`;
@@ -264,15 +264,14 @@ function drawAsphalt(): HTMLCanvasElement {
 }
 
 /**
- * The carriageway: asphalt with painted markings.
+ * Vozovka: asfalt s namalovaným značením.
  *
- * This layer is mapped across the width of a street rather than tiled freely,
- * so the tile is a road cross-section. The kerb lines sit on the tile seam,
- * which puts one on each side of the road once the texture is applied; the
- * dashed line runs down the middle.
+ * Tato vrstva se mapuje přes šířku ulice, nikoli volně dlaždicově, takže dlaždice
+ * je příčný řez silnicí. Okrajové čáry leží na švu dlaždice, čímž po aplikaci
+ * textury vyjde jedna na každou stranu silnice; přerušovaná čára vede středem.
  *
- * A downloaded road texture must follow the same layout to line up — see
- * `SURFACE_TEXTURES` in `city/assets.ts`.
+ * Stažená textura silnice musí mít stejné rozvržení, aby lícovala — viz
+ * `SURFACE_TEXTURES` v `city/assets.ts`.
  */
 function drawRoadway(): HTMLCanvasElement {
   const canvas = drawAsphalt();
@@ -283,7 +282,7 @@ function drawRoadway(): HTMLCanvasElement {
   const line = s * 0.016;
   ctx.fillStyle = '#c4a02a';
 
-  // One wrapped strip on the seam paints the kerb line on both edges.
+  // Jeden přeložený pruh na švu namaluje okrajovou čáru na obou hranách.
   fillWrapped(ctx, -line / 2, 0, line, s);
 
   const dashes = 4;
@@ -311,7 +310,7 @@ function drawSidewalk(): HTMLCanvasElement {
     }
   }
 
-  // Joints, drawn as dark inset lines rather than strokes so they stay crisp.
+  // Spáry, kreslené jako tmavé vnořené čáry místo tahů, aby zůstaly ostré.
   ctx.fillStyle = 'rgba(60,58,52,0.75)';
   for (let i = 0; i < 4; i++) {
     fillWrapped(ctx, i * slab - 1.5, 0, 3, ART_SIZE);
@@ -331,7 +330,7 @@ function drawCobble(): HTMLCanvasElement {
   ctx.fillRect(0, 0, ART_SIZE, ART_SIZE);
 
   for (let j = 0; j < 8; j++) {
-    // Alternate rows are offset half a stone, as real setts are laid.
+    // Každá druhá řada je posunutá o půl kamene, jak se kládá skutečná dlažba.
     const offset = j % 2 === 0 ? 0 : stone / 2;
 
     for (let i = -1; i < 9; i++) {
@@ -351,8 +350,8 @@ function drawCobble(): HTMLCanvasElement {
 }
 
 /**
- * One facade tile covers a single storey and a single window bay, so tiling it
- * across a wall produces an aligned grid of windows.
+ * Jedna dlaždice fasády pokrývá jedno podlaží a jednu okenní osu, takže její
+ * opakování po stěně vytvoří zarovnanou mřížku oken.
  */
 function drawWindow(ctx: CanvasRenderingContext2D, rng: Rng, frame: string, sill: string): void {
   const s = ART_SIZE;
@@ -361,7 +360,7 @@ function drawWindow(ctx: CanvasRenderingContext2D, rng: Rng, frame: string, sill
   const w = s * 0.42;
   const h = s * 0.5;
 
-  // Lintel above and sill below give the opening some apparent depth.
+  // Překlad nahoře a parapet dole dodávají otvoru zdánlivou hloubku.
   ctx.fillStyle = sill;
   ctx.fillRect(x - 7, y - 10, w + 14, 10);
   ctx.fillRect(x - 9, y + h, w + 18, 9);
@@ -369,7 +368,7 @@ function drawWindow(ctx: CanvasRenderingContext2D, rng: Rng, frame: string, sill
   ctx.fillStyle = frame;
   ctx.fillRect(x - 4, y - 4, w + 8, h + 8);
 
-  // Glass: dark at the top where it reflects the sky's shadowed side.
+  // Sklo: nahoře tmavé, kde odráží zastíněnou stranu oblohy.
   const glass = ctx.createLinearGradient(x, y, x, y + h);
   glass.addColorStop(0, '#20262e');
   glass.addColorStop(0.55, '#39424d');
@@ -377,7 +376,7 @@ function drawWindow(ctx: CanvasRenderingContext2D, rng: Rng, frame: string, sill
   ctx.fillStyle = glass;
   ctx.fillRect(x, y, w, h);
 
-  // A few panes lit from inside break up the repetition.
+  // Několik tabulí osvětlených zevnitř naráží opakování.
   if (rng.chance(0.18)) {
     ctx.fillStyle = 'rgba(226,196,132,0.35)';
     ctx.fillRect(x, y, w, h);
@@ -419,7 +418,7 @@ function drawPlasterFacade(): HTMLCanvasElement {
   ctx.fillStyle = '#b9b4a6';
   ctx.fillRect(0, 0, ART_SIZE, ART_SIZE);
 
-  // Blotchy weathering across the stucco.
+  // Skvrnité zvětrání po celé omítce.
   for (let i = 0; i < 60; i++) {
     const shade = Math.floor(rng.range(160, 200));
     ctx.fillStyle = `rgba(${shade},${shade - 5},${shade - 18},0.25)`;
@@ -436,7 +435,7 @@ function drawPlasterFacade(): HTMLCanvasElement {
     ctx.fill();
   }
 
-  // Storey band at the tile edge, so stacked tiles read as floor divisions.
+  // Kordonová římsa na okraji dlaždice, aby naskládané dlaždice působily jako dělení podlaží.
   ctx.fillStyle = 'rgba(120,114,100,0.55)';
   fillWrapped(ctx, 0, -3, ART_SIZE, 6);
 

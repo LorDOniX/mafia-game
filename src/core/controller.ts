@@ -11,16 +11,15 @@ const WALK_SPRINT = 12;
 const FLY_SPEED = 24;
 const FLY_SPRINT = 70;
 const MOUSE_SENSITIVITY = 0.0022;
-/** Higher settles the camera onto the target velocity faster. */
+/** Vyšší hodnota usadí kameru na cílovou rychlost rychleji. */
 const DAMPING = 14;
-/** Take-off speed, m/s, and gravity, m/s^2: about a 1 m jump. */
+/** Rychlost odrazu v m/s a gravitace v m/s^2: skok zhruba 1 m. */
 const JUMP_SPEED = 6;
 const GRAVITY = 18;
 
 /**
- * WASD + mouse-look controller with two modes: `walk` keeps the camera at eye
- * height and collides with buildings, `fly` is unconstrained for inspecting the
- * city from above.
+ * Ovladač WASD + rozhlížení myší se dvěma režimy: `walk` drží kameru ve výšce
+ * očí a koliduje s budovami, `fly` je bez omezení pro prohlížení města shora.
  */
 export class FirstPersonController {
   mode: MoveMode = 'walk';
@@ -60,7 +59,7 @@ export class FirstPersonController {
     const strafeAxis = input.axis('KeyD', 'KeyA');
     const sprinting = input.isDown('ShiftLeft') || input.isDown('ShiftRight');
 
-    // Direction of travel: fly follows the look vector, walk stays level.
+    // Směr pohybu: fly sleduje vektor pohledu, walk zůstává vodorovně.
     const forward = this.mode === 'fly' ? camera.forward() : camera.groundForward();
     const right = camera.groundRight();
 
@@ -74,7 +73,7 @@ export class FirstPersonController {
 
     const magnitude = Math.hypot(targetX, targetY, targetZ);
     if (magnitude > 0) {
-      // Normalise so diagonals are not faster than cardinal movement.
+      // Normalizace, aby diagonály nebyly rychlejší než pohyb v hlavních směrech.
       const speed =
         this.mode === 'fly'
           ? sprinting
@@ -89,10 +88,10 @@ export class FirstPersonController {
       targetZ *= scale;
     }
 
-    // Frame-rate independent exponential smoothing toward the target velocity.
+    // Exponenciální vyhlazování k cílové rychlosti nezávislé na snímkové frekvenci.
     const blend = 1 - Math.exp(-DAMPING * dt);
     this.velocity.x += (targetX - this.velocity.x) * blend;
-    // Walking leaves vertical speed to the jump and gravity.
+    // Při chůzi svislou rychlost řídí skok a gravitace.
     if (this.mode === 'fly') this.velocity.y += (targetY - this.velocity.y) * blend;
     this.velocity.z += (targetZ - this.velocity.z) * blend;
 
@@ -125,7 +124,7 @@ export class FirstPersonController {
           this.velocity.y = 0;
         }
       } else {
-        // Kerbs are only 15cm, so snapping up onto them reads as smooth.
+        // Obrubníky mají jen 15cm, takže přichycení nahoru na ně působí plynule.
         camera.position.y += (ground - camera.position.y) * blend;
         this.velocity.y = 0;
       }

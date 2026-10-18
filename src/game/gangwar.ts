@@ -5,22 +5,22 @@ import type { Rng } from '@/core/rng';
 import type { Vec3 } from '@/math/vec3';
 import { Gangster, type EnemyShot, type GangsterWorld, type Target } from '@/people/gangster';
 
-/** A square of blocks the gang can hold. */
+/** Čtverec bloků, který může gang držet. */
 export interface District {
   bounds: Rect;
   gangsters: Gangster[];
-  /** Held by the gang at the start. */
+  /** Na začátku ho drží gang. */
   contested: boolean;
   captured: boolean;
 }
 
 export interface GangWarOptions {
-  /** Blocks along each side of a district. */
+  /** Počet bloků podél každé strany čtvrti. */
   districtSize: number;
-  /** Districts the gang holds at the start. */
+  /** Čtvrti, které gang na začátku drží. */
   held: number;
   gangstersPerDistrict: { min: number; max: number };
-  /** No gang district here, so the player does not start under fire. */
+  /** Tady není žádná čtvrť gangu, aby hráč nezačínal pod palbou. */
   safe: { x: number; z: number };
 }
 
@@ -32,14 +32,14 @@ export const DEFAULT_GANG_WAR: Omit<GangWarOptions, 'safe'> = {
 
 export const POINTS = { kill: 100, headshot: 50, district: 500, death: -250 };
 export const PLAYER_HEALTH = 100;
-/** Seconds without being hit before health starts coming back, and how fast. */
+/** Sekundy bez zásahu, než se začne obnovovat zdraví, a jak rychle. */
 const REGEN_DELAY = 5;
 const REGEN_RATE = 6;
 const PISTOL_DAMAGE = 40;
 const RANGE = 150;
-/** A car this fast flattens whoever it hits, m/s. */
+/** Auto takto rychlé přejede kohokoli, koho srazí, m/s. */
 const RUN_OVER_SPEED = 4;
-/** How long a muzzle flash lasts, seconds. */
+/** Jak dlouho trvá záblesk z hlavně, sekundy. */
 const FLASH_TIME = 0.07;
 
 export interface GangWarEvent {
@@ -49,7 +49,7 @@ export interface GangWarEvent {
 
 export interface ShotResult {
   distance: number;
-  /** Who was hit, if anyone. */
+  /** Kdo byl zasažen, pokud vůbec někdo. */
   gangster: Gangster | null;
   head: boolean;
   killed: boolean;
@@ -62,18 +62,18 @@ export interface Flash {
 }
 
 /**
- * The game: a rival gang holds districts of the city; clear every gangster
- * from a district to take it, take them all to win. Tracks the score and the
- * player's health, and what happened this frame for the HUD.
+ * Hra: konkurenční gang drží čtvrti města; vyčisti čtvrť od všech gangsterů,
+ * abys ji získal, získej všechny a vyhraješ. Sleduje skóre a zdraví hráče
+ * a to, co se v tomto snímku stalo, pro HUD.
  */
 export class GangWar {
   readonly districts: District[];
   score = 0;
   health = PLAYER_HEALTH;
-  /** Shown to the player and then cleared by whoever displays them. */
+  /** Zobrazí se hráči a pak je vyprázdní ten, kdo je zobrazuje. */
   readonly events: GangWarEvent[] = [];
   readonly flashes: Flash[] = [];
-  /** Set for a frame when the player takes a hit, for the damage flash. */
+  /** Nastaví se na jeden snímek, když hráč dostane zásah, pro záblesk poškození. */
   hurt = 0;
   private sinceHurt = Infinity;
 
@@ -140,7 +140,7 @@ export class GangWar {
     }
   }
 
-  /** The player fires along `direction` (unit length); the world stops the bullet at `wall`. */
+  /** Hráč střílí ve směru `direction` (jednotková délka); svět zastaví střelu ve `wall`. */
   shoot(origin: Vec3, direction: Vec3, wall: (maxDistance: number) => number): ShotResult {
     this.flashes.push({ position: origin, direction, age: 0 });
     let best: ShotResult = { distance: RANGE, gangster: null, head: false, killed: false };
@@ -162,7 +162,7 @@ export class GangWar {
     return best;
   }
 
-  /** A fast car mows down any gangster in its way. */
+  /** Rychlé auto pokosí každého gangstera, který mu stojí v cestě. */
   runOver(car: Obstacle, speed: number): void {
     if (Math.abs(speed) < RUN_OVER_SPEED) return;
     for (const gangster of this.gangsters) {
@@ -174,7 +174,7 @@ export class GangWar {
     this.checkDistricts();
   }
 
-  /** Back to full health; every gangster loses track of the player. */
+  /** Zpátky na plné zdraví; všichni gangsteři ztratí hráče z očí. */
   respawn(): void {
     this.health = PLAYER_HEALTH;
     this.sinceHurt = Infinity;
@@ -205,7 +205,7 @@ export class GangWar {
   }
 }
 
-/** Splits the city into squares of `size` by `size` blocks, streets between them included. */
+/** Rozdělí město na čtverce `size` krát `size` bloků, včetně ulic mezi nimi. */
 export function makeDistricts(layout: CityLayout, size: number): District[] {
   const { gridSize } = layout.config;
   const { pitch } = layout;

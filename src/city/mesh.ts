@@ -20,10 +20,10 @@ type Tint = readonly [number, number, number];
 
 const WHITE: Tint = [1, 1, 1];
 
-/** Built-in facades are drawn one window bay and one storey per tile. */
+/** Vestavěné fasády se kreslí po jedné okenní ose a jednom podlaží na dlaždici. */
 const SINGLE_BAY: FacadeSpan = { bays: 1, storeys: 1 };
 
-/** World metres covered by one tile of each freely-tiled texture. */
+/** Metry světa pokryté jednou dlaždicí každé volně dlaždicované textury. */
 const ASPHALT_TILE = 6;
 const SIDEWALK_TILE = 4;
 const COBBLE_TILE = 2.5;
@@ -31,43 +31,43 @@ const GRASS_TILE = 5;
 const ROOF_TILE = 6;
 
 /**
- * How far the ground plane extends past the last block, in metres.
+ * Jak daleko za poslední blok sahá rovina terénu, v metrech.
  *
- * Without this the ground stops at a hard rectangular edge with skybox below
- * it. Pushing the plane out past the fog's reach hides the boundary instead.
+ * Bez toho by terén končil ostrou obdélníkovou hranou se skyboxem pod ní.
+ * Vysunutí roviny za dosah mlhy hranici místo toho skryje.
  */
 const OUTSKIRTS_MARGIN = 1600;
 
 /**
- * The ground plane sits just below the carriageway.
+ * Rovina terénu leží těsně pod vozovkou.
  *
- * Both are horizontal and would otherwise be coplanar, which z-fights across
- * the entire city. Dropping the plane a few centimetres is cheaper than
- * cutting holes in it for every street.
+ * Obě jsou vodorovné a jinak by byly koplanární, což způsobí z-fighting po celém
+ * městě. Snížit rovinu o pár centimetrů je levnější než do ní vyřezávat díry
+ * pro každou ulici.
  */
 const GROUND_PLANE_Y = -0.04;
 
 /**
- * A marking-free window on the road texture, used for intersections.
+ * Okno v textuře silnice bez značení, používané pro křižovatky.
  *
- * Intersections are exactly one tile across and never repeat, so they can
- * sample an arbitrary sub-rectangle without any seam to worry about — which is
- * how they get clean asphalt out of a texture that has lines painted on it.
+ * Křižovatky mají na šířku přesně jednu dlaždici a nikdy se neopakují, takže mohou
+ * vzorkovat libovolný podobdélník bez obav ze švů — takto získávají čistý asfalt
+ * z textury, na které jsou namalované čáry.
  *
- * Measured in UV space, where v = 0 is the bottom of the image: this window
- * starts 8% down from the top of Road008B.
+ * Měřeno v prostoru UV, kde v = 0 je spodek obrázku: toto okno začíná 8 % pod
+ * horním okrajem Road008B.
  */
 const CLEAN_ROAD_UV = { u0: 0.1, v0: 0.58, u1: 0.44, v1: 0.92 };
 
-/** Height over which baked corner shading fades out, in metres. */
+/** Výška, po kterou zapečené stínování v koutech postupně mizne, v metrech. */
 const AO_HEIGHT = 7;
 const AO_FLOOR = 0.68;
 
 /**
- * Accumulates the whole city into one interleaved buffer.
+ * Shromažďuje celé město do jednoho prokládaného bufferu.
  *
- * The city is static, so everything collapses into a single VAO and a single
- * draw call rather than one per building.
+ * Město je statické, takže se vše sloučí do jednoho VAO a jednoho draw callu
+ * místo jednoho na budovu.
  */
 class MeshBuilder {
   private readonly vertices: number[] = [];
@@ -75,8 +75,8 @@ class MeshBuilder {
   private vertexCount = 0;
 
   /**
-   * Appends a quad from four corners wound counter-clockwise as seen from the
-   * front face, with an explicit UV per corner.
+   * Přidá quad ze čtyř rohů otočených proti směru hodinových ručiček při pohledu
+   * na přední stěnu, s explicitním UV pro každý roh.
    */
   quad(
     corners: Triple[],
@@ -93,8 +93,8 @@ class MeshBuilder {
       const uv = uvs[i];
       if (!corner || !uv) throw new Error('quad() requires four corners and four UVs');
 
-      // Baked ambient occlusion: darken geometry near street level, where a
-      // real city gets very little sky light.
+      // Zapečená ambient occlusion: ztmaví geometrii u úrovně ulice, kam ve
+      // skutečném městě dopadá jen velmi málo světla z oblohy.
       const ao = shade ? AO_FLOOR + (1 - AO_FLOOR) * Math.min(corner[1] / AO_HEIGHT, 1) : 1;
 
       this.vertices.push(
@@ -123,9 +123,9 @@ class MeshBuilder {
   }
 
   /**
-   * Corners of a horizontal quad, in the only order that leaves it facing up.
-   * Note that this runs +Z before +X: corner 0 -> 1 steps along Z, and
-   * corner 0 -> 3 steps along X.
+   * Rohy vodorovného quadu v jediném pořadí, při kterém směřuje nahoru.
+   * Pozor, že +Z jde před +X: roh 0 -> 1 postupuje podél Z a
+   * roh 0 -> 3 podél X.
    */
   private static groundCorners(rect: Rect, y: number): Triple[] {
     return [
@@ -136,16 +136,16 @@ class MeshBuilder {
     ];
   }
 
-  /** Up-facing quad with explicit UVs. */
+  /** Quad směřující nahoru s explicitními UV. */
   groundUV(rect: Rect, y: number, layer: TextureLayer, uvs: UV[]): void {
     this.quad(MeshBuilder.groundCorners(rect, y), [0, 1, 0], uvs, layer, WHITE);
   }
 
-  /** Up-facing quad tiled squarely, one repeat per `tileSize` metres. */
+  /** Quad směřující nahoru, čtvercově dlaždicovaný, jedno opakování na `tileSize` metrů. */
   ground(rect: Rect, y: number, layer: TextureLayer, tileSize: number): void {
-    // The corner order runs +Z first, so U follows Z and V follows X. Each
-    // tile count has to come from its own axis or the texture comes out
-    // stretched on any quad that is not square.
+    // Pořadí rohů jde nejdřív po +Z, takže U sleduje Z a V sleduje X. Každý
+    // počet dlaždic musí vycházet z vlastní osy, jinak se textura na každém
+    // nečtvercovém quadu roztáhne.
     const alongZ = (rect.maxZ - rect.minZ) / tileSize;
     const alongX = (rect.maxX - rect.minX) / tileSize;
 
@@ -158,27 +158,27 @@ class MeshBuilder {
   }
 
   /**
-   * A stretch of carriageway.
+   * Úsek vozovky.
    *
-   * The road texture is authored as a cross-section — kerb lines along its two
-   * edges, centre line down the middle — so U spans the full width exactly
-   * once and only V repeats, along the direction of travel.
+   * Textura silnice je vytvořená jako příčný řez — okrajové čáry podél obou hran,
+   * středová čára uprostřed — takže U pokryje celou šířku přesně jednou a opakuje
+   * se jen V, ve směru jízdy.
    */
   roadway(rect: Rect, along: 'x' | 'z', tileLength: number): void {
     const length = along === 'z' ? rect.maxZ - rect.minZ : rect.maxX - rect.minX;
-    // Whole repeats only, so the dashes stay evenly spaced within a segment.
+    // Jen celá opakování, aby přerušované čáry zůstaly v úseku rovnoměrně rozmístěné.
     const tiles = Math.max(1, Math.round(length / tileLength));
 
     const uvs: UV[] =
       along === 'z'
-        ? // Long in Z: U has to cross the road, so it follows +X (corner 0 -> 3).
+        ? // Dlouhý v Z: U musí křížit silnici, takže sleduje +X (roh 0 -> 3).
           [
             [0, 0],
             [0, tiles],
             [1, tiles],
             [1, 0],
           ]
-        : // Long in X: U crosses the road via +Z (corner 0 -> 1).
+        : // Dlouhý v X: U kříží silnici přes +Z (roh 0 -> 1).
           [
             [0, 0],
             [1, 0],
@@ -189,7 +189,7 @@ class MeshBuilder {
     this.groundUV(rect, 0, TextureLayer.Road, uvs);
   }
 
-  /** Intersection square, taken from the road texture's clean patch. */
+  /** Čtverec křižovatky, vzatý z čistého místa textury silnice. */
   intersection(rect: Rect): void {
     const { u0, v0, u1, v1 } = CLEAN_ROAD_UV;
 
@@ -202,9 +202,9 @@ class MeshBuilder {
   }
 
   /**
-   * Vertical quad running from (x0,z0) to (x1,z1) between heights y0 and y1.
-   * The outward normal is the travel direction rotated a quarter turn, so the
-   * caller controls which way the wall faces by the order of its endpoints.
+   * Svislý quad z (x0,z0) do (x1,z1) mezi výškami y0 a y1.
+   * Vnější normála je směr pohybu otočený o čtvrt obrátky, takže volající
+   * určuje, kam stěna hledí, pořadím jejích koncových bodů.
    */
   wall(
     x0: number,
@@ -251,16 +251,16 @@ class MeshBuilder {
 }
 
 /**
- * Tangent frame for a quad, solved from its corner positions and UVs.
+ * Tangent frame pro quad, vyřešený z pozic jeho rohů a UV.
  *
- * Normal mapping needs to know which way the texture's U axis runs in world
- * space. Walls, ground quads and carriageways all wind differently and assign
- * UVs along different axes, so this inverts the UV jacobian rather than trust
- * any per-case convention.
+ * Normal mapping potřebuje vědět, kudy ve světovém prostoru vede osa U textury.
+ * Stěny, quady terénu i vozovky mají různé pořadí vrcholů a přiřazují UV podél
+ * různých os, takže se zde invertuje jakobián UV místo spoléhání na konvence
+ * pro jednotlivé případy.
  *
- * Returns the unit U direction plus a handedness sign, letting the shader
- * rebuild the bitangent as `cross(normal, tangent) * handedness` instead of
- * spending three more floats per vertex on it.
+ * Vrací jednotkový směr U plus znaménko orientace, takže shader může
+ * dopočítat bitangentu jako `cross(normal, tangent) * handedness`, místo aby
+ * na ni spotřeboval další tři floaty na vrchol.
  */
 function tangentFrame(corners: Triple[], uvs: UV[], normal: Triple): [Triple, number] {
   const p0 = corners[0];
@@ -301,8 +301,8 @@ function tangentFrame(corners: Triple[], uvs: UV[], normal: Triple): [Triple, nu
   tangent[1] /= len;
   tangent[2] /= len;
 
-  // cross(normal, tangent) gives a bitangent candidate; if it opposes the
-  // solved +V direction the frame is left-handed and the sign flips.
+  // cross(normal, tangent) dává kandidáta na bitangentu; pokud míří proti
+  // vyřešenému směru +V, frame je levotočivý a znaménko se otočí.
   const cx = normal[1] * tangent[2] - normal[2] * tangent[1];
   const cy = normal[2] * tangent[0] - normal[0] * tangent[2];
   const cz = normal[0] * tangent[1] - normal[1] * tangent[0];
@@ -316,8 +316,8 @@ export function buildCityMesh(layout: CityLayout): MeshData {
   const { config, bounds } = layout;
   const kerb = config.sidewalkHeight;
 
-  // Unmarked asphalt under the whole map, extended into the haze. Only the
-  // outskirts and the half-width streets at the map edge are ever seen.
+  // Asfalt bez značení pod celou mapou, protažený do oparu. Vidět je z něj vůbec
+  // jen periferie a ulice poloviční šířky na okraji mapy.
   builder.ground(
     {
       minX: bounds.minX - OUTSKIRTS_MARGIN,
@@ -335,8 +335,8 @@ export function buildCityMesh(layout: CityLayout): MeshData {
   for (const block of layout.blocks) {
     const { plot, sidewalk } = block;
 
-    // Sidewalk as a ring of four strips, leaving the plot interior free so the
-    // cobbles below never z-fight against it.
+    // Chodník jako prstenec čtyř pruhů; vnitřek pozemku zůstává volný, aby
+    // dlažba pod ním s ním nikdy neměla z-fighting.
     builder.ground(
       { minX: sidewalk.minX, maxX: sidewalk.maxX, minZ: sidewalk.minZ, maxZ: plot.minZ },
       kerb,
@@ -365,8 +365,8 @@ export function buildCityMesh(layout: CityLayout): MeshData {
     if (block.isPark) builder.ground(plot, kerb, TextureLayer.Grass, GRASS_TILE);
     else builder.ground(plot, kerb, TextureLayer.Cobble, COBBLE_TILE);
 
-    // Kerb face, so the step up from the road is visible rather than implied.
-    // It starts at the ground plane, not at zero, so no gap shows at the base.
+    // Čelo obrubníku, aby byl schod ze silnice vidět, a ne jen naznačen.
+    // Začíná na rovině terénu, ne na nule, aby u paty nebyla vidět mezera.
     addPerimeterWalls(
       builder,
       sidewalk,
@@ -401,25 +401,24 @@ export function buildCityMesh(layout: CityLayout): MeshData {
 }
 
 /**
- * Carriageways and intersections over the street grid.
+ * Vozovky a křižovatky na mřížce ulic.
  *
- * Segments stop short of each crossing and the intersections are laid in
- * separately, so the two directions never overlap and no segment has kerb
- * markings running across its mouth.
+ * Úseky končí před každou křižovatkou a křižovatky se pokládají zvlášť, takže
+ * se oba směry nikdy nepřekrývají a žádný úsek nemá okrajové značení přes své ústí.
  */
 function addRoadNetwork(builder: MeshBuilder, layout: CityLayout): void {
   const { config, pitch } = layout;
 
-  // Sidewalks eat into the street from both sides; what is left is roadway.
+  // Chodníky zabírají ulici z obou stran; co zbude, je vozovka.
   const halfRoad = config.streetWidth / 2 - config.sidewalkWidth;
-  // One texture repeat covers a square of roadway, preserving its aspect.
+  // Jedno opakování textury pokryje čtverec vozovky a zachová její poměr stran.
   const tileLength = halfRoad * 2;
 
   const blockStart = config.streetWidth / 2 - config.sidewalkWidth;
   const blockEnd = config.streetWidth / 2 + config.blockSize + config.sidewalkWidth;
 
-  // Interior streets only. The half-width streets at the map edge would
-  // squash the cross-section, so they stay part of the plain ground plane.
+  // Jen vnitřní ulice. Ulice poloviční šířky na okraji mapy by příčný řez
+  // zmáčkly, takže zůstávají součástí obyčejné roviny terénu.
   for (let street = 1; street < config.gridSize; street++) {
     const centre = street * pitch;
 
@@ -453,10 +452,10 @@ function addRoadNetwork(builder: MeshBuilder, layout: CityLayout): void {
 }
 
 /**
- * Walls around a rectangle with normals pointing outward.
+ * Stěny kolem obdélníku s normálami mířícími ven.
  *
- * The corner order is the one that makes `MeshBuilder.wall`'s rotated normal
- * face away from the rectangle on all four sides.
+ * Pořadí rohů je takové, aby otočená normála z `MeshBuilder.wall` směřovala
+ * od obdélníku na všech čtyřech stranách.
  */
 function addPerimeterWalls(
   builder: MeshBuilder,
@@ -472,9 +471,9 @@ function addPerimeterWalls(
   const width = rect.maxX - rect.minX;
   const depth = rect.maxZ - rect.minZ;
 
-  // Facades fit a whole number of window bays to each wall, so a texture that
-  // spans several bays still starts and ends on a bay boundary; kerbs take an
-  // explicit density.
+  // Fasády na každou stěnu umístí celý počet okenních os, takže textura přes
+  // několik os stále začíná i končí na hranici osy; obrubníky mají
+  // explicitní hustotu.
   const bays = (length: number): number => Math.max(1, Math.round(length / 4)) / baysPerTile;
   const tilesX = uvPerMetre !== undefined ? width * uvPerMetre : bays(width);
   const tilesZ = uvPerMetre !== undefined ? depth * uvPerMetre : bays(depth);

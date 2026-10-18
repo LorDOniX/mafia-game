@@ -1,6 +1,9 @@
 import { daylightAt } from '@/game/clock';
 
-/** Colours round the ring, by hour: night blue, pale dawn, gold noon, pale dusk, night again. */
+/**
+ * Barvy po obvodu prstence podle hodin: noční modř, bledé svítání, zlaté poledne,
+ * bledý soumrak a znovu noc.
+ */
 const RING_STOPS: ReadonlyArray<[number, string]> = [
   [0, '#0f1c45'],
   [4.5, '#16285c'],
@@ -19,9 +22,9 @@ const GOLD_LIGHT = '#f2d27a';
 const SERIF = "Georgia, 'Times New Roman', serif";
 
 /**
- * A 24-hour dial: the ring of hours turns so the current time sits under the
- * pointer at the top, sun at noon and moon at midnight, with the time written
- * in the middle.
+ * 24hodinový ciferník: prstenec hodin se otáčí tak, aby aktuální čas byl pod
+ * ukazatelem nahoře, slunce v poledne a měsíc o půlnoci, s časem vypsaným
+ * uprostřed.
  */
 export class ClockDial {
   private readonly ctx: CanvasRenderingContext2D;
@@ -54,7 +57,7 @@ export class ClockDial {
     ctx.drawImage(this.ring, -c, -c);
     ctx.restore();
 
-    // Dark wooden centre with the time on it.
+    // Tmavý dřevěný střed s časem.
     const wood = ctx.createRadialGradient(c, c - r * 0.2, r * 0.05, c, c, r * 0.62);
     wood.addColorStop(0, '#6a4528');
     wood.addColorStop(1, '#2e1c10');
@@ -70,7 +73,7 @@ export class ClockDial {
     ctx.font = `${r * 0.12}px ${SERIF}`;
     ctx.fillText(`Day ${day}`, c, c + r * 0.27);
 
-    // Pointer at the top, over the hour now.
+    // Ukazatel nahoře, nad aktuální hodinou.
     ctx.fillStyle = GOLD_LIGHT;
     ctx.strokeStyle = '#7a5a1c';
     ctx.lineWidth = r * 0.015;
@@ -84,7 +87,7 @@ export class ClockDial {
   }
 }
 
-/** The turning part: coloured ring, hours, sun, moon and stars, with midnight at the top. */
+/** Otáčená část: barevný prstenec, hodiny, slunce, měsíc a hvězdy, s půlnocí nahoře. */
 function drawRing(size: number): HTMLCanvasElement {
   const canvas = document.createElement('canvas');
   canvas.width = size;
@@ -110,7 +113,7 @@ function drawRing(size: number): HTMLCanvasElement {
   for (const [hour, color] of RING_STOPS) band.addColorStop(hour / 24, color);
   disc(ctx, c, c, r * 0.97, band);
 
-  // Sun at noon.
+  // Slunce v poledne.
   const sun = at(12, mid);
   const halo = ctx.createRadialGradient(sun.x, sun.y, 0, sun.x, sun.y, r * 0.28);
   halo.addColorStop(0, 'rgba(255, 214, 90, 0.95)');
@@ -129,14 +132,14 @@ function drawRing(size: number): HTMLCanvasElement {
   }
   disc(ctx, sun.x, sun.y, r * 0.075, '#f7b52c');
 
-  // Moon at midnight.
+  // Měsíc o půlnoci.
   const moon = at(0, mid);
   disc(ctx, moon.x, moon.y, r * 0.1, '#e9ebef');
   disc(ctx, moon.x - r * 0.03, moon.y - r * 0.02, r * 0.022, '#c3c7cf');
   disc(ctx, moon.x + r * 0.035, moon.y + r * 0.03, r * 0.016, '#c3c7cf');
   ring(ctx, moon.x, moon.y, r * 0.1, '#9aa0aa', r * 0.01);
 
-  // Stars on the half hours of the night, where the numbers leave room.
+  // Hvězdy na půlhodinách noci, kde čísla nechávají místo.
   let seed = 7;
   const random = (): number => {
     seed = (seed * 16807) % 2147483647;
@@ -163,7 +166,7 @@ function drawRing(size: number): HTMLCanvasElement {
     ctx.restore();
   }
 
-  // Dark band of quarter-hour ticks between the ring and the centre.
+  // Tmavý pás čtvrthodinových značek mezi prstencem a středem.
   disc(ctx, c, c, r * 0.71, '#17120c');
   ctx.strokeStyle = GOLD;
   for (let q = 0; q < 96; q++) {

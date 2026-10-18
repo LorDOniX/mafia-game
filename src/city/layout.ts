@@ -1,6 +1,6 @@
 import { createRng } from '@/core/rng';
 
-/** Axis-aligned rectangle on the XZ ground plane. */
+/** Obdélník zarovnaný s osami v rovině terénu XZ. */
 export interface Rect {
   minX: number;
   minZ: number;
@@ -9,35 +9,35 @@ export interface Rect {
 }
 
 export const TextureLayer = {
-  /** Carriageway, with painted markings. Mapped across the road width. */
+  /** Vozovka s namalovaným značením. Mapuje se přes šířku silnice. */
   Road: 0,
   Sidewalk: 1,
   Cobble: 2,
   Brick: 3,
   Plaster: 4,
   Roof: 5,
-  /** Unmarked asphalt, tiled freely. Used for the ground plane. */
+  /** Asfalt bez značení, volně dlaždicovaný. Použitý pro rovinu terénu. */
   Asphalt: 6,
-  /** Park lawns. */
+  /** Parkové trávníky. */
   Grass: 7,
 } as const;
 
 export type TextureLayer = (typeof TextureLayer)[keyof typeof TextureLayer];
 
-/** Built-in layers come first in the texture array; custom facades follow. */
+/** Vestavěné vrstvy jsou v texture array první; za nimi následují vlastní fasády. */
 export const BUILTIN_LAYER_COUNT = Object.keys(TextureLayer).length;
 
 /**
- * Any layer of the surface texture array: a built-in `TextureLayer`, or a
- * custom facade appended after them (see `city/facades.ts`).
+ * Libovolná vrstva texture array povrchů: vestavěná `TextureLayer`, nebo
+ * vlastní fasáda přidaná za ně (viz `city/facades.ts`).
  */
 export type SurfaceLayer = number;
 
-/** How much of a facade one repeat of its texture covers. */
+/** Jakou část fasády pokryje jedno opakování její textury. */
 export interface FacadeSpan {
-  /** Window bays across the image. */
+  /** Okenní osy na šířku obrázku. */
   bays: number;
-  /** Storeys up the image. */
+  /** Podlaží na výšku obrázku. */
   storeys: number;
 }
 
@@ -45,61 +45,61 @@ export interface Building {
   footprint: Rect;
   height: number;
   facade: SurfaceLayer;
-  /** Absent means one bay by one storey, which is how built-in facades are drawn. */
+  /** Chybí-li, jde o jednu osu na jedno podlaží, tak jsou kresleny vestavěné fasády. */
   facadeSpan?: FacadeSpan;
   tint: [number, number, number];
 }
 
 export interface Block {
-  /** The buildable plot, excluding the surrounding sidewalk. */
+  /** Stavební pozemek bez okolního chodníku. */
   plot: Rect;
-  /** The plot expanded by the sidewalk width. */
+  /** Pozemek rozšířený o šířku chodníku. */
   sidewalk: Rect;
-  /** Open blocks (plazas/parks) carry no buildings. */
+  /** Otevřené bloky (náměstí/parky) nemají žádné budovy. */
   buildings: Building[];
   isPlaza: boolean;
-  /** A plaza laid to grass rather than paved. */
+  /** Náměstí zatravněné místo vydlážděného. */
   isPark: boolean;
 }
 
 export interface TreeSpot {
   x: number;
   z: number;
-  /** Street trees line sidewalks and squares; park trees are mixed. */
+  /** Uliční stromy lemují chodníky a náměstí; parkové stromy jsou smíšené. */
   kind: 'street' | 'park';
-  /** In [0, 1), for picking a species from whichever list `kind` uses. */
+  /** V [0, 1), pro výběr druhu ze seznamu, který používá `kind`. */
   variant: number;
   rotation: number;
-  /** Multiplier on the species' height. */
+  /** Násobitel výšky druhu. */
   size: number;
 }
 
 export interface LampSpot {
   x: number;
   z: number;
-  /** Turns the lamp's arm (model +Z) out over the road; see `rotationY`. */
+  /** Natáčí rameno lampy (model +Z) nad silnici; viz `rotationY`. */
   rotation: number;
 }
 
 export interface CityConfig {
   seed: number;
-  /** Blocks per side; the city is always square. */
+  /** Počet bloků na stranu; město je vždy čtvercové. */
   gridSize: number;
   blockSize: number;
   streetWidth: number;
   sidewalkWidth: number;
   sidewalkHeight: number;
   floorHeight: number;
-  /** How far a perimeter building reaches into its block. */
+  /** Jak hluboko sahá obvodová budova do svého bloku. */
   buildingDepth: number;
   minBuildingWidth: number;
   maxBuildingWidth: number;
   plazaChance: number;
-  /** Chance of a built block becoming a park instead, at the edge of town; none downtown. */
+  /** Šance, že se zastavěný blok na okraji města stane parkem; v centru nulová. */
   parkChance: number;
-  /** Gap between street trees along a sidewalk, metres. */
+  /** Rozestup uličních stromů podél chodníku, v metrech. */
   streetTreeSpacing: number;
-  /** Gap between street lamps along a sidewalk, besides the one on every corner. */
+  /** Rozestup pouličních lamp podél chodníku, kromě lampy na každém rohu. */
   lampSpacing: number;
 }
 
@@ -126,15 +126,15 @@ export interface CityLayout {
   buildings: Building[];
   trees: TreeSpot[];
   lamps: LampSpot[];
-  /** Full extent of the ground plane, streets included. */
+  /** Celý rozsah roviny terénu včetně ulic. */
   bounds: Rect;
-  /** Centre-to-centre distance between adjacent blocks. */
+  /** Vzdálenost středů sousedních bloků. */
   pitch: number;
 }
 
 const FACADES: TextureLayer[] = [TextureLayer.Brick, TextureLayer.Plaster];
 
-/** Warm brick and pale stucco tones, kept desaturated for a period look. */
+/** Teplé cihlové a světlé omítkové tóny, desaturované pro dobový vzhled. */
 const BRICK_TINTS: Array<[number, number, number]> = [
   [1.0, 0.86, 0.76],
   [0.92, 0.74, 0.64],
@@ -152,8 +152,8 @@ const PLASTER_TINTS: Array<[number, number, number]> = [
 export function generateCity(overrides: Partial<CityConfig> = {}): CityLayout {
   const config: CityConfig = { ...DEFAULT_CITY_CONFIG, ...overrides };
   const rng = createRng(config.seed);
-  // Parks and trees draw from their own stream, so adding them leaves every
-  // building where it was.
+  // Parky a stromy čerpají z vlastního proudu, takže jejich přidání nechá
+  // každou budovu tam, kde byla.
   const greenRng = createRng(config.seed ^ 0x5eed7ee5);
   const pitch = config.blockSize + config.streetWidth;
   const half = config.streetWidth / 2;
@@ -161,7 +161,7 @@ export function generateCity(overrides: Partial<CityConfig> = {}): CityLayout {
   const blocks: Block[] = [];
   const buildings: Building[] = [];
   const centre = (config.gridSize - 1) / 2;
-  // Longest distance from the middle block, used to taper heights outward.
+  // Největší vzdálenost od prostředního bloku, slouží ke snižování výšek směrem ven.
   const maxDistance = Math.hypot(centre, centre) || 1;
 
   for (let j = 0; j < config.gridSize; j++) {
@@ -176,7 +176,7 @@ export function generateCity(overrides: Partial<CityConfig> = {}): CityLayout {
       const sidewalk = expand(plot, config.sidewalkWidth);
       const isPlaza = rng.chance(config.plazaChance);
 
-      // Downtown sits in the middle: 1 at the centre block, 0 at the corners.
+      // Centrum je uprostřed: 1 v prostředním bloku, 0 v rozích.
       const density = 1 - Math.hypot(i - centre, j - centre) / maxDistance;
 
       const block: Block = { plot, sidewalk, buildings: [], isPlaza, isPark: false };
@@ -216,10 +216,10 @@ function expand(rect: Rect, amount: number): Rect {
 }
 
 /**
- * Lines buildings up along all four edges of a block, terrace-style.
+ * Řadí budovy podél všech čtyř okrajů bloku, jako řadovou zástavbu.
  *
- * North and south rows span the full width; east and west rows are inset by the
- * building depth so the four rows meet at the corners instead of overlapping.
+ * Severní a jižní řada pokrývají celou šířku; východní a západní jsou odsazeny o
+ * hloubku budovy, takže se čtyři řady v rozích setkají místo překrývání.
  */
 function fillPerimeter(
   block: Block,
@@ -260,7 +260,7 @@ function fillPerimeter(
       const remaining = row.end - cursor;
       let width = rng.range(config.minBuildingWidth, config.maxBuildingWidth);
 
-      // Absorb a stub too small to stand on its own rather than leaving a gap.
+      // Pohltí zbytek příliš malý na samostatnou budovu, místo aby zůstala mezera.
       if (remaining - width < config.minBuildingWidth) width = remaining;
 
       const facade = rng.pick(FACADES);
@@ -279,19 +279,19 @@ function fillPerimeter(
   }
 }
 
-/** Trunk distance from the kerb edge of a sidewalk. */
+/** Vzdálenost kmene od obrubníkové hrany chodníku. */
 const STREET_TREE_INSET = 1.2;
-/** Sidewalk left bare at each corner, for the crossing. */
+/** Volný úsek chodníku na každém rohu, kvůli přechodu. */
 const CORNER_CLEARANCE = 7;
-/** Squares: a ring of trees this far inside the plot, this far apart. */
+/** Náměstí: prstenec stromů takto daleko uvnitř pozemku, s tímto rozestupem. */
 const SQUARE_TREE_INSET = 4;
 const SQUARE_TREE_SPACING = 12;
-/** Parks: one tree per grid cell, maybe, with paths left clear through the middle. */
+/** Parky: nanejvýš jeden strom na buňku mřížky, středem vedou volné cesty. */
 const PARK_CELL = 9;
 const PARK_FILL = 0.75;
 const PARK_PATH_HALF_WIDTH = 4;
 
-/** Street trees along every sidewalk, a ring round each square, and parks planted. */
+/** Uliční stromy podél každého chodníku, prstenec kolem každého náměstí a osázené parky. */
 function plantTrees(
   blocks: readonly Block[],
   config: CityConfig,
@@ -313,7 +313,7 @@ function plantTrees(
     const { sidewalk, plot } = block;
     const s = STREET_TREE_INSET;
     for (const side of rectSides(sidewalk, s)) {
-      // One species per side of the street, as an avenue would be planted.
+      // Jeden druh na každou stranu ulice, jak by se sázela alej.
       const variant = rng.next();
       for (const p of evenlyAlong(side, CORNER_CLEARANCE, config.streetTreeSpacing)) {
         spot(p.x, p.z, 'street', variant);
@@ -346,14 +346,14 @@ function plantTrees(
   return trees;
 }
 
-/** Pole distance from the kerb edge of a sidewalk. */
+/** Vzdálenost sloupu od obrubníkové hrany chodníku. */
 const LAMP_INSET = 0.6;
-/** A lamp this close to a street tree is dropped, so the crown does not swallow it. */
+/** Lampa takto blízko uličního stromu se vynechá, aby ji nepohltila koruna. */
 const LAMP_TREE_CLEARANCE = 4;
 
 /**
- * A lamp on every sidewalk corner, angled into the crossroads, and more along
- * each side, arms out over the road.
+ * Lampa na každém rohu chodníku, natočená do křižovatky, a další podél
+ * každé strany, s rameny nad silnicí.
  */
 function placeLamps(
   blocks: readonly Block[],
@@ -365,7 +365,7 @@ function placeLamps(
     !trees.some(
       (t) => t.kind === 'street' && Math.hypot(t.x - x, t.z - z) < LAMP_TREE_CLEARANCE,
     );
-  // Outward normals of the sides `rectSides` returns, in the same order.
+  // Vnější normály stran, které vrací `rectSides`, ve stejném pořadí.
   const outward = [
     { x: 0, z: -1 },
     { x: 0, z: 1 },
@@ -400,7 +400,7 @@ interface Segment {
   to: { x: number; z: number };
 }
 
-/** The four sides of a rect, each pulled `inset` in from its edge, running full length. */
+/** Čtyři strany obdélníku, každá posunutá o `inset` dovnitř od okraje, po celé délce. */
 function rectSides(rect: Rect, inset: number): Segment[] {
   const { minX, maxX, minZ, maxZ } = rect;
   return [
@@ -411,7 +411,7 @@ function rectSides(rect: Rect, inset: number): Segment[] {
   ];
 }
 
-/** Points spaced evenly along a segment, centred, keeping `margin` clear at both ends. */
+/** Body rovnoměrně rozmístěné podél úsečky, vystředěné, s volným `margin` na obou koncích. */
 function evenlyAlong(
   { from, to }: Segment,
   margin: number,

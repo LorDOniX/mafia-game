@@ -67,10 +67,10 @@ describe('parseGlb', () => {
 
     expect(data.parts.map((part) => part.name)).toEqual(['tree_oak', 'tree_oak']);
     const [crown, trunk] = data.parts;
-    // Leaves are green-dominant, bark red-dominant.
+    // U listů převažuje zelená, u kůry červená.
     expect(crown?.baseColor[1]).toBeGreaterThan(crown?.baseColor[0] ?? 1);
     expect(trunk?.baseColor[0]).toBeGreaterThan(trunk?.baseColor[1] ?? 1);
-    // Each part keeps only the vertices its own triangles use.
+    // Každá část si ponechá jen vrcholy, které používají její vlastní trojúhelníky.
     for (const part of data.parts) {
       const used = new Set(part.indices);
       expect(used.size).toBe(part.vertices.length / FLOATS_PER_MODEL_VERTEX);

@@ -1,14 +1,14 @@
 #define MAX_LIGHTS 32
 
 uniform int u_lightCount;
-// xyz position, w range in metres.
+// xyz pozice, w dosah v metrech.
 uniform vec4 u_lightPos[MAX_LIGHTS];
-// xyz cone axis, w cosine of the outer half-angle.
+// xyz osa kužele, w kosinus vnějšího poloúhlu.
 uniform vec4 u_lightDir[MAX_LIGHTS];
-// rgb colour times intensity, w cosine of the inner half-angle.
+// rgb barva krát intenzita, w kosinus vnitřního poloúhlu.
 uniform vec4 u_lightColor[MAX_LIGHTS];
 
-// Diffuse light from every spot light reaching this point.
+// Difúzní světlo ze všech spot lightů, které dosahují do tohoto bodu.
 vec3 spotLights(vec3 worldPos, vec3 n) {
   vec3 total = vec3(0.0);
   for (int i = 0; i < MAX_LIGHTS; i++) {
@@ -21,7 +21,7 @@ vec3 spotLights(vec3 worldPos, vec3 n) {
 
     vec3 l = toLight / dist;
     float cone = smoothstep(u_lightDir[i].w, u_lightColor[i].w, dot(-l, u_lightDir[i].xyz));
-    // Inverse square, windowed so it reaches exactly zero at the range.
+    // Inverzní kvadrát s oknem, aby na hranici dosahu klesl přesně na nulu.
     float window = clamp(1.0 - pow(dist / range, 4.0), 0.0, 1.0);
     float falloff = window * window / (dist * dist + 1.0);
 

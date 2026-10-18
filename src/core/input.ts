@@ -1,15 +1,16 @@
 import { vec2, type Vec2 } from '@/math/vec2';
 
 /**
- * Keyboard + pointer-lock mouse input.
+ * Vstup z klávesnice + myši s pointer lockem.
  *
- * Mouse look needs relative motion, which the browser only reports while the
- * pointer is locked, so look deltas accumulate between frames and are drained
- * by `endFrame()`. Callers must read deltas before that call.
+ * Rozhlížení myší potřebuje relativní pohyb, který prohlížeč hlásí jen při
+ * zamčeném kurzoru, takže se delty pohledu mezi snímky sčítají a vyprázdní je
+ * `endFrame()`. Volající musí delty přečíst před tímto voláním.
  */
 /**
- * Keys the game consumes. Only these have their default action suppressed, so
- * browser shortcuts — and crucially Escape's pointer-lock release — still work.
+ * Klávesy, které hra zpracovává. Jen u nich se potlačí výchozí akce, takže
+ * zkratky prohlížeče — a hlavně uvolnění pointer locku klávesou Escape — stále
+ * fungují.
  */
 const GAME_KEYS = new Set([
   'KeyW',
@@ -33,7 +34,7 @@ export class Input {
   private readonly pressedThisFrame = new Set<string>();
   private readonly teardown: Array<() => void> = [];
 
-  /** Accumulated mouse motion since the last `endFrame()`, in raw pixels. */
+  /** Nasčítaný pohyb myši od posledního `endFrame()`, v surových pixelech. */
   readonly lookDelta: Vec2 = vec2();
   pointerLocked = false;
 
@@ -42,14 +43,14 @@ export class Input {
       if (!this.held.has(e.code)) this.pressedThisFrame.add(e.code);
       this.held.add(e.code);
 
-      // Escape releases the lock. Browsers do this themselves, but doing it
-      // explicitly keeps the behaviour identical everywhere.
+      // Escape uvolní zámek. Prohlížeče to dělají samy, ale explicitní volání
+      // zajišťuje všude stejné chování.
       if (e.code === 'Escape') {
         document.exitPointerLock();
         return;
       }
 
-      // Space scrolls, Tab moves focus away from the canvas.
+      // Mezerník posouvá stránku, Tab přesouvá fokus pryč z canvasu.
       if (this.pointerLocked && GAME_KEYS.has(e.code)) e.preventDefault();
     };
 
@@ -61,7 +62,7 @@ export class Input {
       this.lookDelta.y += e.movementY;
     };
 
-    // Buttons count only in play, so the click that grabs the mouse never fires.
+    // Tlačítka se počítají jen ve hře, takže klik, který zachytí myš, nikdy nevystřelí.
     const onMouseDown = (e: MouseEvent): void => {
       if (!this.pointerLocked) return;
       const code = `Mouse${e.button}`;
@@ -73,15 +74,15 @@ export class Input {
     const onLockChange = (): void => {
       this.pointerLocked = document.pointerLockElement === canvas;
       if (!this.pointerLocked) {
-        // Keys held when focus is lost would otherwise stay stuck down.
+        // Klávesy držené při ztrátě fokusu by jinak zůstaly zaseknuté dole.
         this.held.clear();
         this.lookDelta.x = 0;
         this.lookDelta.y = 0;
       }
     };
 
-    // Bound to the document, not the canvas: the start overlay covers the
-    // whole viewport, so a canvas-only listener never sees the first click.
+    // Navázáno na document, ne na canvas: úvodní overlay překrývá celý viewport,
+    // takže listener jen na canvasu by první klik nikdy nezachytil.
     const onClick = (): void => this.requestPointerLock();
 
     window.addEventListener('keydown', onKeyDown);
@@ -108,9 +109,9 @@ export class Input {
   requestPointerLock(): void {
     if (this.pointerLocked) return;
 
-    // Browsers reject the request outside a user gesture and during the short
-    // cooldown after Esc. Both are expected, so swallow the rejection rather
-    // than let it surface as an unhandled promise.
+    // Prohlížeče požadavek odmítnou mimo uživatelské gesto a během krátké
+    // prodlevy po Esc. Obě situace jsou očekávané, takže se zamítnutí spolkne,
+    // místo aby se projevilo jako neošetřený promise.
     const pending: unknown = this.canvas.requestPointerLock();
     if (pending instanceof Promise) pending.catch(() => {});
   }
@@ -119,12 +120,12 @@ export class Input {
     return this.held.has(code);
   }
 
-  /** True only on the frame the key went down. Relies on `endFrame()`. */
+  /** True jen ve snímku, kdy byla klávesa stisknuta. Spoléhá na `endFrame()`. */
   wasPressed(code: string): boolean {
     return this.pressedThisFrame.has(code);
   }
 
-  /** Returns 1, -1 or 0 for a pair of opposing keys. */
+  /** Vrací 1, -1 nebo 0 pro dvojici protichůdných kláves. */
   axis(positive: string, negative: string): number {
     return (this.isDown(positive) ? 1 : 0) - (this.isDown(negative) ? 1 : 0);
   }

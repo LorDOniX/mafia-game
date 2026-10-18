@@ -58,19 +58,19 @@ import { CombatHud } from '@/ui/combat-hud';
 
 const HUD_INTERVAL = 0.25;
 const PLAYER_CAR_COLOR = '#e0b84a';
-/** Shader light slots kept for headlights; street lamps get the rest. */
+/** Sloty světel v shaderu vyhrazené pro světlomety; zbytek dostanou pouliční lampy. */
 const HEADLIGHT_SLOTS = 8;
-/** Room the player takes up on foot, for traffic to stop short of. */
+/** Místo, které hráč zabírá pěšky, aby provoz zastavil před ním. */
 const PEDESTRIAN_RADIUS = 0.4;
-/** Seconds between going down and getting back up at the start. */
+/** Sekundy mezi pádem a opětovným vstáním na startu. */
 const RESPAWN_DELAY = 2.5;
-/** Camera kick per shot, radians of pitch. */
+/** Zpětný ráz kamery na výstřel, v radiánech náklonu (pitch). */
 const RECOIL = 0.015;
-/** Muzzle flash: bright, wide and short. */
+/** Záblesk z hlavně: jasný, široký a krátký. */
 const FLASH_COLOR: [number, number, number] = [80, 60, 30];
 const FLASH_RANGE = 14;
 
-/** A car out of traffic: the one the player is driving, or one left parked. */
+/** Auto mimo provoz: to, které hráč řídí, nebo jedno ponechané zaparkované. */
 interface FreeCar {
   vehicle: Vehicle;
   model: Model;
@@ -78,7 +78,7 @@ interface FreeCar {
   config: VehicleModelConfig;
   mapColor: string;
   odometerKm: number;
-  /** The world as this car sees it: everything solid except itself. */
+  /** Svět, jak ho vidí toto auto: vše pevné kromě něj samotného. */
   world: VehicleWorld;
 }
 
@@ -118,14 +118,14 @@ async function main(): Promise<void> {
   const input = new Input(canvas);
   const controller = new FirstPersonController(camera, input, collision);
 
-  // Spawn in the middle of a crossroads, looking down the avenue: block N
-  // starts at N * pitch + streetWidth / 2, so whole multiples of the pitch land
-  // on street centrelines.
+  // Spawn uprostřed křižovatky s pohledem podél třídy: blok N začíná
+  // na N * pitch + streetWidth / 2, takže celé násobky pitch padnou
+  // na osy ulic.
   const spawn = Math.floor(layout.config.gridSize / 2) * layout.pitch;
   controller.teleport(spawn, spawn, Math.PI);
 
-  // Textures and the sky are built or fetched before the first frame, so the
-  // renderer itself stays synchronous.
+  // Textury a obloha se sestaví nebo stáhnou před prvním snímkem, takže samotný
+  // renderer zůstává synchronní.
   const defaultPrompt = prompt.textContent ?? 'Click to enter the city';
   prompt.textContent = 'Building Lost Heaven\u2026';
   const species = Object.keys(TREE_MODELS) as TreeSpecies[];
@@ -143,7 +143,7 @@ async function main(): Promise<void> {
 
   const renderer = new Renderer(ctx, layout, assets);
 
-  // Every tree of a species is merged into one static model, drawn in place.
+  // Stromy jednoho druhu se sloučí do jednoho statického modelu, kresleného na místě.
   const trees: ModelInstance[] = species.flatMap((s, i) => {
     const loaded = treeModels[i];
     if (!loaded) return [];
@@ -170,7 +170,7 @@ async function main(): Promise<void> {
   };
   const lampLights = layout.lamps.map((spot) => lampLight(spot, kerb));
 
-  // A random handful of animals in every park, different each visit.
+  // Náhodná hrstka zvířat v každém parku, při každé návštěvě jiná.
   const animalRng = createRng((Math.random() * 2 ** 32) >>> 0);
   const breeds = ANIMALS.flatMap((species, i) => {
     const loaded = animalModels[i];
@@ -198,7 +198,7 @@ async function main(): Promise<void> {
         )
     : [];
 
-  // The rival gang, each member in a random one of the character models.
+  // Soupeřící gang, každý člen v náhodně vybraném modelu postavy.
   const gangRng = createRng((Math.random() * 2 ** 32) >>> 0);
   const war = new GangWar(
     layout,
@@ -218,15 +218,15 @@ async function main(): Promise<void> {
   if (looks.length) for (const g of war.gangsters) lookOf.set(g, gangRng.pick(looks));
   const pistol = new Pistol();
   const combatHud = new CombatHud();
-  /** Counts down from RESPAWN_DELAY once the player is killed. */
+  /** Odpočítává od RESPAWN_DELAY, jakmile je hráč zabit. */
   let downFor = 0;
 
-  // Time runs while playing; N or the button skips ahead to evening or morning.
+  // Čas běží během hraní; N nebo tlačítko přeskočí dopředu na večer nebo na ráno.
   const clock = new GameClock();
   const isDay = (): boolean => daylightAt(clock.hour).daylight > 0.5;
   const skipTime = (): void => clock.skipTo(isDay() ? 21 : 7);
   dayNight.addEventListener('click', (event) => {
-    // The document-wide click would otherwise grab the mouse.
+    // Kliknutí zachycené na úrovni celého dokumentu by jinak zamklo myš.
     event.stopPropagation();
     skipTime();
   });
@@ -256,9 +256,9 @@ async function main(): Promise<void> {
     },
   });
 
-  // Parked just past the spawn crossroads, in the right-hand lane of the
-  // avenue the player starts out looking down. Any car taken from traffic
-  // joins it here, and stays wherever it is left.
+  // Zaparkované kousek za křižovatkou spawnu, v pravém pruhu třídy, do níž se
+  // hráč na začátku dívá. Každé auto vzaté z provozu se k němu přidá zde
+  // a zůstane tam, kde ho hráč nechá.
   const freeCars: FreeCar[] = [];
   if (carModel) {
     const fit = fitVehicle(carModel.data, VEHICLE);
@@ -268,7 +268,7 @@ async function main(): Promise<void> {
   }
   let driven: FreeCar | null = null;
 
-  /** What traffic has to stop for besides itself: cars out of traffic, and people on foot. */
+  /** Kvůli čemu musí provoz zastavit kromě sebe sama: auta mimo provoz a chodci. */
   const playerObstacles = (): Obstacle[] => {
     const list = freeCars.map((c) => carObstacle(c.vehicle, c.vehicle));
     const person = (x: number, z: number): Obstacle => ({
@@ -283,7 +283,7 @@ async function main(): Promise<void> {
     return list;
   };
 
-  // A town's worth of traffic, models picked by their weights.
+  // Provoz pro celé město, modely vybrané podle svých vah.
   const trafficRng = createRng((Math.random() * 2 ** 32) >>> 0);
   const fleet = TRAFFIC_CARS.flatMap((entry, i) => {
     const loaded = trafficModels[i];
@@ -316,8 +316,8 @@ async function main(): Promise<void> {
     color,
   });
 
-  // A denied lock request (no user gesture, or the cooldown right after Esc)
-  // would otherwise read as a dead click.
+  // Zamítnutý požadavek na pointer lock (bez gesta uživatele, nebo prodleva hned
+  // po Esc) by jinak působil jako kliknutí, které nic neudělá.
   document.addEventListener('pointerlockerror', () => {
     prompt.textContent = 'Could not capture the mouse \u2014 click again';
   });
@@ -345,9 +345,9 @@ async function main(): Promise<void> {
 
   let flashlightOn = false;
   /**
-   * The flashlight and muzzle flashes first, then headlights of traffic and the
-   * driven car, then the nearest lamps, the last two dimmed as the lights come
-   * up at dusk.
+   * Nejprve baterka a záblesky z hlavní, pak světlomety provozu a řízeného auta,
+   * pak nejbližší lampy; poslední dvě skupiny ztlumené podle toho, jak se
+   * za soumraku rozsvěcují světla.
    */
   const sceneLights = (level: number): SpotLight[] => {
     const own = [
@@ -368,8 +368,8 @@ async function main(): Promise<void> {
   };
 
   /**
-   * The nearest car within reach, parked or in traffic. One taken from traffic
-   * leaves it for good: it becomes a free car, driven now and parked once left.
+   * Nejbližší auto na dosah, zaparkované nebo v provozu. Auto vzaté z provozu ho
+   * opustí natrvalo: stane se volným autem, teď řízeným a po opuštění zaparkovaným.
    */
   const enterNearestCar = (): FreeCar | null => {
     const { x, z } = camera.position;
@@ -405,7 +405,7 @@ async function main(): Promise<void> {
   let playTime = 0;
   const simulate = (dt: number): void => {
     clock.advance(dt);
-    // Cars are solid, except the one being driven, to itself and its chase camera.
+    // Auta jsou pevná; jen řízené auto není překážkou samo sobě a své sledovací kameře.
     collision.setObstacles([
       ...traffic.obstacles(),
       ...freeCars.filter((c) => c !== driven).map((c) => carObstacle(c.vehicle, c.vehicle)),
@@ -424,7 +424,7 @@ async function main(): Promise<void> {
       }
     }
 
-    // Left cars keep simulating, handbrake on, so one left rolling skids to a stop.
+    // Opuštěná auta se simulují dál se zataženou ruční brzdou; rozjeté smykem zastaví.
     for (const car of freeCars) {
       car.vehicle.update(dt, car === driven ? drive.controls() : PARKED, car.world);
     }
@@ -440,7 +440,7 @@ async function main(): Promise<void> {
     fight(dt);
   };
 
-  /** The gang war this frame: the player's shots, the gang's, and getting back up. */
+  /** Válka gangů v tomto snímku: výstřely hráče, výstřely gangu a opětovné vstání. */
   const fight = (dt: number): void => {
     pistol.update(dt);
     const standing = war.alive;
@@ -477,7 +477,7 @@ async function main(): Promise<void> {
   };
 
   startLoop(({ dt }) => {
-    // The menu is up whenever the mouse is free; the world holds still behind it.
+    // Menu je zobrazené, kdykoli je myš volná; svět za ním stojí.
     const paused = !input.pointerLocked;
     if (!paused) {
       playTime += dt;
@@ -590,7 +590,7 @@ async function main(): Promise<void> {
     overlay.hidden = locked;
     crosshair.hidden = !locked;
 
-    // Smooth the frame rate before showing it; raw per-frame dt is unreadable.
+    // Snímkovou frekvenci před zobrazením vyhladit; surové dt každého snímku je nečitelné.
     fps += (1 / Math.max(dt, 1e-6) - fps) * 0.1;
 
     hudTimer += dt;

@@ -3,30 +3,30 @@ import type { Input } from './input';
 import type { CityCollision } from '@/city/collision';
 import type { Vehicle, VehicleControls } from '@/vehicle/vehicle';
 
-/** How close to the bodywork the player must stand to get in, in metres. */
+/** Jak blízko ke karoserii musí hráč stát, aby nastoupil, v metrech. */
 const ENTER_REACH = 1.5;
-/** Gap left between the bodywork and the player on getting out. */
+/** Mezera mezi karoserií a hráčem při vystoupení. */
 const EXIT_CLEARANCE = 0.9;
 const PLAYER_RADIUS = 0.5;
 
 const CHASE_DISTANCE = 8;
-/** Point on the car the camera looks at, above its base. */
+/** Bod na voze, na který se kamera dívá, nad jeho základnou. */
 const LOOK_HEIGHT = 1.4;
 const DEFAULT_ORBIT_PITCH = 0.3;
 const MIN_ORBIT_PITCH = -0.1;
 const MAX_ORBIT_PITCH = 1.2;
-/** Higher swings the camera in behind the car faster. */
+/** Vyšší hodnota stočí kameru za vůz rychleji. */
 const FOLLOW = 5;
-/** Rate at which a mouse-look offset drifts back behind the car once moving. */
+/** Rychlost, kterou se odchylka pohledu myší vrací za vůz, jakmile jede. */
 const RECENTRE = 1.2;
 const MOUSE_SENSITIVITY = 0.0022;
 const CAMERA_RADIUS = 0.3;
 const MIN_CAMERA_HEIGHT = 0.5;
 
 /**
- * Driving: turns keys into vehicle controls and flies a chase camera behind
- * the car. Getting in and out is the caller's decision; this only answers
- * whether the player is close enough and where they can step out.
+ * Řízení: převádí klávesy na ovládání vozidla a vede chase kameru za vozem.
+ * O nastoupení a vystoupení rozhoduje volající; tato třída jen odpovídá, zda je
+ * hráč dost blízko a kde může vystoupit.
  */
 export class DriveController {
   private cameraYaw = 0;
@@ -39,7 +39,7 @@ export class DriveController {
     private readonly collision: CityCollision,
   ) {}
 
-  /** W/S throttle and reverse, A/D steer, Space handbrake. */
+  /** W/S plyn a couvání, A/D zatáčení, mezerník ruční brzda. */
   controls(): VehicleControls {
     const { input } = this;
     return {
@@ -49,9 +49,9 @@ export class DriveController {
     };
   }
 
-  /** True if (x, z) is within reach of the car's bodywork. */
+  /** True, pokud je (x, z) na dosah karoserie vozu. */
   canEnter(vehicle: Vehicle, x: number, z: number): boolean {
-    // Distance to the car's footprint rectangle, measured in its own frame.
+    // Vzdálenost k obdélníku půdorysu vozu, měřená v jeho vlastní soustavě.
     const dx = x - vehicle.x;
     const dz = z - vehicle.z;
     const f = vehicle.forward();
@@ -62,7 +62,7 @@ export class DriveController {
     return Math.hypot(Math.max(along, 0), Math.max(across, 0)) <= ENTER_REACH;
   }
 
-  /** Puts the camera straight behind the car, dropping any look offset. */
+  /** Postaví kameru přímo za vůz a zruší případnou odchylku pohledu. */
   enter(vehicle: Vehicle): void {
     this.cameraYaw = vehicle.heading;
     this.orbitYaw = 0;
@@ -70,8 +70,8 @@ export class DriveController {
   }
 
   /**
-   * Where the player steps out: the driver's (left) side first, then the
-   * right, behind and ahead. Null if the car is boxed in on every side.
+   * Kde hráč vystoupí: nejprve na straně řidiče (levé), pak vpravo, vzadu
+   * a vpředu. Null, pokud je vůz zablokovaný ze všech stran.
    */
   exitPoint(vehicle: Vehicle): { x: number; z: number } | null {
     const f = vehicle.forward();
@@ -94,7 +94,7 @@ export class DriveController {
     return null;
   }
 
-  /** Call after the vehicle has moved this frame. */
+  /** Volat poté, co se vozidlo v tomto snímku pohnulo. */
   updateCamera(dt: number, vehicle: Vehicle): void {
     const { camera, input } = this;
     const look = input.pointerLocked ? input.lookDelta : { x: 0, y: 0 };
@@ -105,13 +105,13 @@ export class DriveController {
       MAX_ORBIT_PITCH,
     );
 
-    // Looking around while parked stays put; once driving, the view drifts
-    // back behind the car so the road ahead is always in shot.
+    // Rozhlížení při staní zůstává; při jízdě se pohled vrací za vůz, aby byla
+    // silnice před ním vždy v záběru.
     if (Math.abs(vehicle.speed) > 2 && look.x === 0) {
       this.orbitYaw *= Math.exp(-RECENTRE * dt);
     }
 
-    // Lag behind the heading so turns read as motion rather than a spinning world.
+    // Zpoždění za směrem jízdy, aby zatáčky působily jako pohyb, ne točící se svět.
     this.cameraYaw += wrapAngle(vehicle.heading - this.cameraYaw) * (1 - Math.exp(-FOLLOW * dt));
 
     const yaw = this.cameraYaw + this.orbitYaw;
@@ -123,7 +123,7 @@ export class DriveController {
       z: target.z + Math.cos(yaw) * flat,
     };
 
-    // Pull in along the boom rather than end up inside a building.
+    // Přisunout kameru podél ramene, místo aby skončila uvnitř budovy.
     const steps = 16;
     let reach = 1;
     for (let i = 1; i <= steps; i++) {
@@ -143,14 +143,14 @@ export class DriveController {
     const dx = target.x - camera.position.x;
     const dy = target.y - camera.position.y;
     const dz = target.z - camera.position.z;
-    // Fully pulled in, the camera sits on the target and has no direction.
+    // Při plném přisunutí leží kamera na cíli a nemá žádný směr.
     if (Math.hypot(dx, dz) < 1e-3) return;
     camera.yaw = Math.atan2(dx, -dz);
     camera.pitch = Math.atan2(dy, Math.hypot(dx, dz));
   }
 }
 
-/** Wraps an angle into (-pi, pi], so the camera always turns the short way round. */
+/** Zalomí úhel do (-pi, pi], aby se kamera vždy otáčela kratší cestou. */
 function wrapAngle(angle: number): number {
   const turn = Math.PI * 2;
   return angle - turn * Math.round(angle / turn);

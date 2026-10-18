@@ -22,7 +22,7 @@ export function createBuffer(
   return buffer;
 }
 
-/** Creates a VAO with the given attributes bound to `buffer`. */
+/** Vytvoří VAO se zadanými atributy navázanými na `buffer`. */
 export function createVertexArray(
   gl: WebGL2RenderingContext,
   buffer: WebGLBuffer,

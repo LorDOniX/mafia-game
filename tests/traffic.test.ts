@@ -27,7 +27,7 @@ function bodyOf(url: string): VehicleBody {
 const sedan = bodyOf('/models-car/sedan.glb');
 const firetruck = bodyOf('/models-car/firetruck.glb');
 
-/** Corners of a footprint, in the vehicle heading convention. */
+/** Rohy půdorysu v konvenci natočení vozidla. */
 function corners(o: Obstacle): Array<{ x: number; z: number }> {
   const f = { x: Math.sin(o.heading), z: -Math.cos(o.heading) };
   const r = { x: Math.cos(o.heading), z: Math.sin(o.heading) };
@@ -42,7 +42,7 @@ function corners(o: Obstacle): Array<{ x: number; z: number }> {
   }));
 }
 
-/** Separating-axis test for two footprints. */
+/** Test oddělujících os pro dva půdorysy. */
 function overlap(a: Obstacle, b: Obstacle): boolean {
   const ca = corners(a);
   const cb = corners(b);
@@ -69,7 +69,7 @@ function footprint(vehicle: Vehicle): Obstacle {
   };
 }
 
-/** Points sampled every half metre along a path, with headings. */
+/** Body vzorkované každého půl metru podél trasy, včetně natočení. */
 function along(path: Path): Obstacle[] {
   const out: Obstacle[] = [];
   for (let i = 0; i + 1 < path.points.length; i++) {
@@ -175,7 +175,7 @@ describe('Traffic', () => {
     }
 
     expect(crashes).toBe(0);
-    // Over the last 40 seconds, nearly every car got somewhere.
+    // Za posledních 40 sekund se skoro každé auto někam dostalo.
     const stuck = [...moved.values()].filter((d) => d < 5).length;
     expect(stuck).toBeLessThan(10);
   });
@@ -202,7 +202,7 @@ describe('Traffic', () => {
   it('lets a car be taken out of traffic, freeing any crossroads it claimed', () => {
     const traffic = town(20, 7);
     const rng = createRng(8);
-    // Run until some car has claimed a crossroads.
+    // Běží, dokud si některé auto nezabere křižovatku.
     let claimer = traffic.cars.find((c) => c.cleared);
     for (let t = 0; t < 30 && !claimer; t += 1 / 20) {
       traffic.update(1 / 20, [], rng);

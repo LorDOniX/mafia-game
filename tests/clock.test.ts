@@ -2,18 +2,19 @@ import { describe, expect, it } from 'vitest';
 import { DAY_LENGTH_SECONDS, daylightAt, GameClock } from '@/game/clock';
 
 describe('GameClock', () => {
-  it('starts at noon on day one', () => {
+  it('starts at seven in the morning on day one', () => {
     const clock = new GameClock();
-    expect(clock.label()).toBe('12:00');
+    expect(clock.label()).toBe('07:00');
     expect(clock.day).toBe(1);
   });
 
-  it('runs a whole day in two minutes', () => {
+  it('runs a whole day in five minutes', () => {
+    expect(DAY_LENGTH_SECONDS).toBe(300);
     const clock = new GameClock();
     clock.advance(DAY_LENGTH_SECONDS / 4);
-    expect(clock.label()).toBe('18:00');
+    expect(clock.label()).toBe('13:00');
     clock.advance((DAY_LENGTH_SECONDS * 3) / 4);
-    expect(clock.label()).toBe('12:00');
+    expect(clock.label()).toBe('07:00');
     expect(clock.day).toBe(2);
   });
 
@@ -40,12 +41,12 @@ describe('daylightAt', () => {
     for (let hour = 16; hour <= 20; hour += 0.05) {
       const { daylight } = daylightAt(hour);
       expect(daylight).toBeLessThanOrEqual(previous + 1e-9);
-      // No jump between frames a twentieth of an hour apart.
+      // Žádný skok mezi snímky vzdálenými od sebe dvacetinu hodiny.
       expect(previous - daylight).toBeLessThan(0.1);
       if (daylight > 0.01 && daylight < 0.99) steps++;
       previous = daylight;
     }
-    // Spread over more than an hour of game time.
+    // Rozloženo na více než hodinu herního času.
     expect(steps).toBeGreaterThan(20);
   });
 

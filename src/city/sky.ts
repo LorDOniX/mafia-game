@@ -3,44 +3,44 @@ import { sampleBilinear } from '@/gfx/image';
 
 export const SKY_FACE_SIZE = 256;
 
-/** Late-afternoon sun. Shared with the renderer so shading matches the sky. */
+/** Pozdně odpolední slunce. Sdílené s rendererem, aby stínování odpovídalo obloze. */
 export const SUN_DIRECTION: Vec3 = normalize({ x: 0.38, y: 0.42, z: -0.82 });
 
-/** The haze colour at eye level; the city's fog fades to this exact value. */
+/** Barva oparu ve výšce očí; mlha města přechází přesně do této hodnoty. */
 export const HORIZON_COLOR: [number, number, number] = [0.74, 0.76, 0.75];
 
 const ZENITH_COLOR: [number, number, number] = [0.21, 0.38, 0.66];
 const GROUND_COLOR: [number, number, number] = [0.3, 0.29, 0.27];
 
-/** Night haze at eye level, lifted a touch by the city's own glow; night fog fades to it. */
+/** Noční opar ve výšce očí, lehce zesvětlený září samotného města; noční mlha přechází do něj. */
 export const NIGHT_HORIZON_COLOR: [number, number, number] = [0.05, 0.05, 0.065];
 const NIGHT_ZENITH_COLOR: [number, number, number] = [0.004, 0.006, 0.018];
 const NIGHT_GROUND_COLOR: [number, number, number] = [0.01, 0.01, 0.012];
-/** Share of sky texels that hold a star. */
+/** Podíl texelů oblohy, na kterých je hvězda. */
 const STAR_DENSITY = 0.004;
 
 type SkyShader = (dir: Vec3, face: number, px: number, py: number) => [number, number, number];
 
 /**
- * Cube map faces in the order WebGL expects: +X, -X, +Y, -Y, +Z, -Z.
+ * Stěny cube mapy v pořadí, které očekává WebGL: +X, -X, +Y, -Y, +Z, -Z.
  *
- * Each texel is converted back to a direction and shaded analytically, which
- * keeps the sky consistent with `SUN_DIRECTION` without needing any artwork.
+ * Každý texel se převede zpět na směr a analyticky se vystínuje, takže obloha
+ * zůstává konzistentní se `SUN_DIRECTION` bez potřeby jakékoli grafiky.
  */
 export function createSkyFaces(size = SKY_FACE_SIZE): ImageData[] {
   return [0, 1, 2, 3, 4, 5].map((face) => renderFace(face, size, shadeSky));
 }
 
-/** A moonless night: near-black overhead, a faint glow at the horizon, and stars. */
+/** Bezměsíčná noc: nad hlavou téměř černo, slabá záře na obzoru a hvězdy. */
 export function createNightSkyFaces(size = SKY_FACE_SIZE): ImageData[] {
   return [0, 1, 2, 3, 4, 5].map((face) => renderFace(face, size, shadeNightSky));
 }
 
 /**
- * Direction to equirectangular (longitude, latitude) in normalised UV.
+ * Směr na ekvirektangulární (zeměpisná délka, šířka) v normalizovaných UV.
  *
- * u wraps at the -Z meridian, matching the convention panorama HDRIs use, so
- * a sky loaded this way lines up with the same world axes as the procedural one.
+ * u se přetáčí na poledníku -Z, podle konvence panoramatických HDRI, takže
+ * takto načtená obloha je zarovnaná se stejnými osami světa jako ta procedurální.
  */
 export function directionToEquirectUV(dir: Vec3): { u: number; v: number } {
   return {
@@ -50,10 +50,10 @@ export function directionToEquirectUV(dir: Vec3): { u: number; v: number } {
 }
 
 /**
- * Resamples an equirectangular panorama into six cube faces.
+ * Převzorkuje ekvirektangulární panorama do šesti stěn krychle.
  *
- * Sky HDRIs are distributed as panoramas rather than cube maps, so this is the
- * conversion step between what you can download and what WebGL can sample.
+ * HDRI oblohy se distribuují jako panoramata, ne jako cube mapy, takže tohle je
+ * převodní krok mezi tím, co lze stáhnout, a tím, co umí WebGL vzorkovat.
  */
 export function panoramaToSkyFaces(panorama: ImageData, size = SKY_FACE_SIZE): ImageData[] {
   const rgb: [number, number, number] = [0, 0, 0];
@@ -106,10 +106,10 @@ function renderFace(face: number, size: number, shade: SkyShader): ImageData {
 }
 
 /**
- * Maps a texel on cube face `face` to the direction it represents.
+ * Převede texel na stěně krychle `face` na směr, který představuje.
  *
- * Face order and axis conventions follow GL_TEXTURE_CUBE_MAP_POSITIVE_X..
- * NEGATIVE_Z, including the flipped vertical axis.
+ * Pořadí stěn a konvence os odpovídají GL_TEXTURE_CUBE_MAP_POSITIVE_X..
+ * NEGATIVE_Z, včetně převrácené svislé osy.
  */
 export function faceDirection(face: number, u: number, v: number): Vec3 {
   switch (face) {
@@ -129,7 +129,7 @@ export function faceDirection(face: number, u: number, v: number): Vec3 {
 }
 
 function shadeSky(dir: Vec3): [number, number, number] {
-  // Above the horizon: haze near eye level easing up into deep blue.
+  // Nad obzorem: opar ve výšce očí plynule přecházející do sytě modré.
   const up = Math.max(dir.y, 0);
   const gradient = Math.pow(up, 0.45);
 
@@ -138,8 +138,8 @@ function shadeSky(dir: Vec3): [number, number, number] {
   let b = lerp(HORIZON_COLOR[2], ZENITH_COLOR[2], gradient);
 
   if (dir.y < 0) {
-    // Below the horizon the city covers almost everything; a dull haze is
-    // enough, and it keeps gaps between buildings from flashing bright.
+    // Pod obzorem město zakryje téměř vše; stačí matný opar a mezery mezi
+    // budovami díky němu jasně neprobleskují.
     const down = Math.min(-dir.y / 0.25, 1);
     r = lerp(HORIZON_COLOR[0], GROUND_COLOR[0], down);
     g = lerp(HORIZON_COLOR[1], GROUND_COLOR[1], down);
@@ -147,8 +147,8 @@ function shadeSky(dir: Vec3): [number, number, number] {
     return [r, g, b];
   }
 
-  // Clouds: sample noise on a plane above the viewer, projected along the view
-  // ray, and fade them out toward the horizon where the plane goes singular.
+  // Mraky: vzorkuje se šum na rovině nad pozorovatelem promítnutý podél paprsku
+  // pohledu a k obzoru, kde je rovina singulární, se mraky vytrácejí.
   if (dir.y > 0.02) {
     const scale = 1.6;
     const px = (dir.x / dir.y) * scale;
@@ -187,7 +187,7 @@ function shadeNightSky(dir: Vec3, face: number, px: number, py: number): [number
     lerp(NIGHT_HORIZON_COLOR[k] ?? 0, NIGHT_ZENITH_COLOR[k] ?? 0, gradient),
   ) as [number, number, number];
 
-  // One texel per star; the haze near the horizon swallows them.
+  // Jeden texel na hvězdu; opar u obzoru je pohltí.
   const h = hash(px + face * 4096, py);
   if (h > 1 - STAR_DENSITY) {
     const brightness = ((h - (1 - STAR_DENSITY)) / STAR_DENSITY) * smoothstep(0.04, 0.3, dir.y);
@@ -206,7 +206,7 @@ function smoothstep(edge0: number, edge1: number, x: number): number {
   return t * t * (3 - 2 * t);
 }
 
-/** Deterministic 2D hash in [0, 1). */
+/** Deterministický 2D hash v [0, 1). */
 function hash(x: number, y: number): number {
   const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453123;
   return n - Math.floor(n);

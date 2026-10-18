@@ -6,8 +6,8 @@ const UP: Vec3 = { x: 0, y: 1, z: 0 };
 const MAX_PITCH = Math.PI / 2 - 0.01;
 
 /**
- * Yaw/pitch camera. Yaw is measured from -Z and grows clockwise seen from
- * above, so yaw 0 / pitch 0 looks straight down -Z with +X to the right.
+ * Kamera s yaw/pitch. Yaw se měří od -Z a při pohledu shora roste ve směru
+ * hodinových ručiček, takže yaw 0 / pitch 0 hledí přímo podél -Z a +X je vpravo.
  */
 export class Camera {
   position: Vec3 = vec3();
@@ -23,7 +23,7 @@ export class Camera {
   readonly projection: Mat4 = new Float32Array(16);
   readonly viewProjection: Mat4 = new Float32Array(16);
 
-  /** Unit vector the camera is looking along. */
+  /** Jednotkový vektor, podél kterého se kamera dívá. */
   forward(): Vec3 {
     const cosPitch = Math.cos(this.pitch);
     return {
@@ -33,7 +33,7 @@ export class Camera {
     };
   }
 
-  /** Forward flattened onto the ground plane — what walking should follow. */
+  /** Směr vpřed zploštěný do roviny země — ten má sledovat chůze. */
   groundForward(): Vec3 {
     return { x: Math.sin(this.yaw), y: 0, z: -Math.cos(this.yaw) };
   }
@@ -42,7 +42,7 @@ export class Camera {
     return { x: Math.cos(this.yaw), y: 0, z: Math.sin(this.yaw) };
   }
 
-  /** Field of view across the screen width; `fov` is the vertical one. */
+  /** Zorné pole přes šířku obrazovky; `fov` je to svislé. */
   horizontalFov(): number {
     return 2 * Math.atan(Math.tan(this.fov / 2) * this.aspect);
   }
@@ -52,7 +52,7 @@ export class Camera {
     this.pitch = Math.min(Math.max(this.pitch + deltaPitch, -MAX_PITCH), MAX_PITCH);
   }
 
-  /** Recomputes view/projection. Call once per frame after moving. */
+  /** Přepočítá view/projection. Volat jednou za snímek po pohybu. */
   update(): void {
     perspective(this.fov, this.aspect, this.near, this.far, this.projection);
     lookAt(this.position, add(this.position, this.forward()), UP, this.view);

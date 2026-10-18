@@ -1,7 +1,7 @@
 export interface FrameInfo {
-  /** Seconds since the previous frame, clamped to avoid spiral-of-death. */
+  /** Sekundy od předchozího snímku, ořezané kvůli prevenci spiral-of-death. */
   dt: number;
-  /** Seconds since the loop started. */
+  /** Sekundy od spuštění smyčky. */
   elapsed: number;
   frame: number;
 }

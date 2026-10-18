@@ -1,15 +1,15 @@
-/** Top of the dial, km/h. */
+/** Maximum stupnice, km/h. */
 const SPEED_MAX = 240;
 const SPEED_LABEL_STEP = 15;
-/** Top of the rev counter, rpm. */
+/** Maximum otáčkoměru, rpm. */
 const RPM_MAX = 8000;
 const IDLE_RPM = 800;
 const REDLINE_RPM = 6500;
-/** Top speed of each forward gear, km/h; the last runs to the end of the dial. */
+/** Maximální rychlost každého převodu vpřed, km/h; poslední vede až na konec stupnice. */
 const GEAR_TOPS = [25, 45, 65, 90, SPEED_MAX];
 const REVERSE_TOP = 26;
 
-/** Needle sweep: from lower left, clockwise over the top, to lower right. */
+/** Rozsah ručičky: zleva dole, po směru hodinových ručiček přes vrchol, doprava dolů. */
 const START_ANGLE = (135 * Math.PI) / 180;
 const SWEEP = (270 * Math.PI) / 180;
 
@@ -18,14 +18,14 @@ const NAVY_DARK = '#0e1734';
 const NEEDLE = '#d4322a';
 
 export interface DashState {
-  /** Signed: negative is reversing. */
+  /** Se znaménkem: záporná znamená couvání. */
   speedKmh: number;
   odometerKm: number;
 }
 
 /**
- * A pretend gearbox, since the car model has none: it shifts up through
- * GEAR_TOPS and works out revs from where the speed sits in the current gear.
+ * Předstíraná převodovka, protože model auta žádnou nemá: řadí nahoru podle
+ * GEAR_TOPS a otáčky odvozuje z toho, kde v aktuálním převodu rychlost leží.
  */
 export function engine(speedKmh: number): { gear: string; rpm: number } {
   const speed = Math.abs(speedKmh);
@@ -41,7 +41,7 @@ export function engine(speedKmh: number): { gear: string; rpm: number } {
   for (let i = 0; i < GEAR_TOPS.length; i++) {
     const top = GEAR_TOPS[i] ?? SPEED_MAX;
     if (speed <= top || i === GEAR_TOPS.length - 1) {
-      // Each upshift drops the revs back to a third of the way up the band.
+      // Každé přeřazení nahoru srazí otáčky zpět na třetinu pásma.
       const floor = i === 0 ? IDLE_RPM : IDLE_RPM + (REDLINE_RPM - IDLE_RPM) / 3;
       const t = Math.min((speed - bottom) / (top - bottom), 1);
       return { gear: String(i + 1), rpm: floor + (REDLINE_RPM - floor) * t };
@@ -52,9 +52,9 @@ export function engine(speedKmh: number): { gear: string; rpm: number } {
 }
 
 /**
- * A 1930s chrome-rimmed speedometer with a small rev counter beside it,
- * drawn on one canvas. The dials are drawn once per size; only the needles,
- * gear and odometer change each frame.
+ * Tachometr ve stylu 30. let s chromovaným rámečkem a malým otáčkoměrem vedle,
+ * kreslený na jeden canvas. Ciferníky se kreslí jednou pro každou velikost; každý
+ * snímek se mění jen ručičky, převod a počítadlo kilometrů.
  */
 export class Speedometer {
   private readonly ctx: CanvasRenderingContext2D;
@@ -97,7 +97,7 @@ interface Dial {
   r: number;
 }
 
-/** Big dial in the bottom right of the canvas, the small one tucked in at its lower left. */
+/** Velký ciferník vpravo dole na canvasu, malý zastrčený u jeho levé dolní strany. */
 function layoutOf(width: number, height: number): { speed: Dial; rev: Dial } {
   const r = Math.min(width * 0.36, height * 0.48);
   const speed = { x: width - r - 2, y: height - r - 2, r };
@@ -121,7 +121,7 @@ function drawFaces(width: number, height: number): HTMLCanvasElement {
 function drawSpeedFace(ctx: CanvasRenderingContext2D, { x, y, r }: Dial): void {
   bezel(ctx, x, y, r);
 
-  // Navy ring carrying the numbers, white face inside it.
+  // Námořnicky modrý prstenec s čísly, uvnitř něj bílý ciferník.
   const ring = ctx.createRadialGradient(x, y, r * 0.6, x, y, r * 0.92);
   ring.addColorStop(0, NAVY);
   ring.addColorStop(1, NAVY_DARK);
@@ -191,7 +191,7 @@ function drawRevFace(ctx: CanvasRenderingContext2D, { x, y, r }: Dial): void {
   ctx.fillText('x1000', x, y + r * 0.42);
 }
 
-/** Polished chrome rim. */
+/** Leštěný chromový rámeček. */
 function bezel(ctx: CanvasRenderingContext2D, x: number, y: number, r: number): void {
   ctx.save();
   ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
@@ -222,7 +222,7 @@ function drawGear(ctx: CanvasRenderingContext2D, { x, y, r }: Dial, gear: string
   ctx.fillText(gear, x, top + h / 2 + r * 0.005);
 }
 
-/** Rolling-drum odometer: whole kilometres, then tenths on a red drum. */
+/** Válečkové počítadlo kilometrů: celé kilometry, pak desetiny na červeném válečku. */
 function drawOdometer(ctx: CanvasRenderingContext2D, { x, y, r }: Dial, km: number): void {
   const digits = 5;
   const cell = r * 0.085;

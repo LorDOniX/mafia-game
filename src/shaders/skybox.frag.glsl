@@ -5,9 +5,9 @@ in vec3 v_dir;
 
 uniform samplerCube u_sky;
 uniform samplerCube u_nightSky;
-/** 0 shows the day sky, 1 the night sky, anything between a crossfade. */
+/** 0 zobrazí denní oblohu, 1 noční, cokoli mezi tím prolínání. */
 uniform float u_night;
-/** Sunrise and sunset warmth, strongest right at the horizon. */
+/** Teplo východu a západu slunce, nejsilnější přímo na obzoru. */
 uniform vec3 u_glow;
 
 out vec4 outColor;

@@ -23,7 +23,7 @@ export const alivePlayers = (state: GameState): Player[] => state.players.filter
 export const countAlive = (state: GameState, role: Role): number =>
   state.players.filter((p) => p.alive && p.role === role).length;
 
-/** Returns the winning side, or null if the game continues. */
+/** Vrátí vítěznou stranu, nebo null, pokud hra pokračuje. */
 export function checkWinner(state: GameState): 'mafia' | 'town' | null {
   const mafia = countAlive(state, 'mafia');
   const town = alivePlayers(state).length - mafia;

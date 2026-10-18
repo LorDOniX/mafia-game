@@ -1,18 +1,18 @@
-/** Real seconds in one game day. */
-export const DAY_LENGTH_SECONDS = 120;
-export const START_HOUR = 12;
+/** Skutečné sekundy jednoho herního dne. */
+export const DAY_LENGTH_SECONDS = 300;
+export const START_HOUR = 7;
 
-/** How the time of day lights the city; every value runs smoothly from 0 to 1. */
+/** Jak denní doba osvětluje město; každá hodnota plynule běží od 0 do 1. */
 export interface Daylight {
-  /** 1 at full day, 0 at full night: sun, sky light, fog and sky blend on this. */
+  /** 1 za plného dne, 0 za plné noci: podle toho se míchá slunce, světlo oblohy, mlha a nebe. */
   daylight: number;
-  /** Peaks at sunrise and sunset, for the warm glow low in the sky. */
+  /** Vrchol při východu a západu slunce, pro teplý zář nízko na obloze. */
   dusk: number;
-  /** How far up the street lamps and headlights are turned. */
+  /** Jak moc jsou zapnuté pouliční lampy a světlomety. */
   lights: number;
 }
 
-/** Game time, in hours since the start, advancing with play. */
+/** Herní čas v hodinách od začátku, plyne s hrou. */
 export class GameClock {
   constructor(public elapsedHours = START_HOUR) {}
 
@@ -20,22 +20,22 @@ export class GameClock {
     this.elapsedHours += (seconds * 24) / DAY_LENGTH_SECONDS;
   }
 
-  /** Hour of the day, 0 up to 24. */
+  /** Hodina dne, od 0 do 24. */
   get hour(): number {
     return ((this.elapsedHours % 24) + 24) % 24;
   }
 
-  /** 1 on the first day. */
+  /** 1 první den. */
   get day(): number {
     return Math.floor(this.elapsedHours / 24) + 1;
   }
 
-  /** Jumps forward to the next time the clock reads `hour`. */
+  /** Skočí dopředu na nejbližší okamžik, kdy hodiny ukážou `hour`. */
   skipTo(hour: number): void {
     this.elapsedHours += (hour - this.hour + 24) % 24 || 24;
   }
 
-  /** "HH:MM", in 24-hour time. */
+  /** "HH:MM", ve 24hodinovém formátu. */
   label(): string {
     const minutes = Math.floor(this.hour * 60);
     const hh = String(Math.floor(minutes / 60)).padStart(2, '0');
@@ -45,8 +45,8 @@ export class GameClock {
 }
 
 /**
- * Sunrise at 6, noon overhead at 12, sunset at 18. Each transition spans an
- * hour or two of game time, a handful of real seconds, so dusk is a fade.
+ * Východ slunce v 6, poledne nad hlavou ve 12, západ v 18. Každý přechod trvá
+ * hodinu či dvě herního času, pár skutečných sekund, takže soumrak je prolnutí.
  */
 export function daylightAt(hour: number): Daylight {
   const elevation = Math.sin(((hour - 6) / 12) * Math.PI);

@@ -2,13 +2,13 @@ import type { Camera } from './camera';
 import type { SpotLight } from '@/gfx/lights';
 import { HEADLIGHT_INTENSITY, HEADLIGHT_RANGE } from '@/vehicle/model';
 
-/** Held a little below eye level, so the beam is not a flat disc dead centre. */
+/** Držena kousek pod úrovní očí, aby kužel nebyl plochý kotouč přesně uprostřed. */
 const HAND_DROP = 0.3;
 const COLOR: readonly [number, number, number] = [1.0, 0.97, 0.9];
 const INNER = 0.12;
 const OUTER = 0.35;
 
-/** A torch pointing wherever the camera looks, as strong and far-reaching as a headlight. */
+/** Baterka mířící tam, kam se dívá kamera, stejně silná a dalekosáhlá jako světlomet. */
 export function flashlight(camera: Camera): SpotLight {
   const { x, y, z } = camera.position;
   return {

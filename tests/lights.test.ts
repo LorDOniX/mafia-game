@@ -56,11 +56,11 @@ describe('street lamps', () => {
     };
     for (let o = 0; o < glass.vertices.length; o += FLOATS_PER_MODEL_VERTEX) {
       const [x = 0, y = 0, z = 0, nx = 0, ny = 0, nz = 0] = glass.vertices.subarray(o, o + 6);
-      // Outward: the normal leans the same way as the offset from the box centre.
+      // Ven: normála se naklání stejným směrem jako odsazení od středu boxu.
       expect((x - centre.x) * nx + (y - centre.y) * ny + (z - centre.z) * nz).toBeGreaterThan(0);
     }
 
-    // Counter-clockwise seen from outside, or back-face culling eats the faces.
+    // Proti směru hodinových ručiček při pohledu zvenku, jinak back-face culling stěny sežere.
     const at = (i: number, k: number): number => glass.vertices[i * FLOATS_PER_MODEL_VERTEX + k] ?? 0;
     for (let t = 0; t < glass.indices.length; t += 3) {
       const [a = 0, b = 0, c = 0] = glass.indices.subarray(t, t + 3);
@@ -94,11 +94,11 @@ describe('nearestLights', () => {
 
     expect(chosen.map((l) => l.position.x)).toEqual([0, 39, 40]);
     expect(chosen[0]?.color[0]).toBe(10);
-    // The cut falls at 100, so 39 and 40 are still at full strength.
+    // Hranice je na 100, takže 39 a 40 mají stále plnou sílu.
     expect(chosen[2]?.color[0]).toBe(10);
 
     const tight = nearestLights([light(0, 0), light(95, 0), light(100, 0)], { x: 0, y: 0, z: 0 }, 2);
-    // Cut at 100, fading from 75: the one at 95 keeps a fifth of its strength.
+    // Hranice na 100, útlum od 75: světlo na 95 si ponechá pětinu své síly.
     expect(tight[1]?.color[0]).toBeCloseTo(2);
   });
 

@@ -13,20 +13,20 @@ uniform vec3 u_sunColor;
 uniform vec3 u_ambient;
 uniform vec3 u_fogColor;
 uniform float u_fogDensity;
-/** Glow that needs no light: lamp glass at night. */
+/** Záře, která nepotřebuje světlo: sklo lampy v noci. */
 uniform vec3 u_emissive;
 
 #include "lights.glsl"
 
 out vec4 outColor;
 
-// Lighting and fog mirror city.frag, so models sit in the same light as the
-// buildings around them.
+// Osvětlení a mlha odpovídají city.frag, takže modely stojí ve stejném světle
+// jako okolní budovy.
 void main() {
   vec3 albedo = texture(u_texture, v_uv).rgb * u_baseColor.rgb;
 
-  // Double-sided materials are drawn without culling; light the back face as
-  // the side the viewer actually sees.
+  // Oboustranné materiály se kreslí bez cullingu; zadní stěnu osvětlit jako
+  // stranu, kterou pozorovatel skutečně vidí.
   vec3 n = normalize(v_normal) * (gl_FrontFacing ? 1.0 : -1.0);
 
   float sun = max(dot(n, u_sunDir), 0.0);
@@ -36,6 +36,6 @@ void main() {
   float dist = distance(v_worldPos, u_cameraPos);
   float fog = 1.0 - exp(-pow(dist * u_fogDensity, 2.0));
 
-  // Glowing parts cut through the haze further than lit ones.
+  // Zářící části pronikají oparem dál než osvětlené.
   outColor = vec4(mix(lit, u_fogColor, fog) + u_emissive * (1.0 - fog * 0.6), 1.0);
 }

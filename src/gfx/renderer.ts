@@ -18,16 +18,16 @@ import fragmentSource from '@/shaders/city.frag.glsl?raw';
 const SUN_COLOR: [number, number, number] = [1.0, 0.94, 0.82];
 const AMBIENT: [number, number, number] = [0.42, 0.46, 0.54];
 /**
- * Tuned so the far corners of the map dissolve into the skybox horizon while
- * leaving the nearer blocks readable from the air.
+ * Vyladěno tak, aby se vzdálené rohy mapy rozplynuly v horizontu skyboxu a
+ * bližší bloky přitom zůstaly ze vzduchu čitelné.
  */
 const FOG_DENSITY = 0.0016;
 
-/** No sun, and barely any sky light: after dark the lamps and headlights do the work. */
+/** Žádné slunce a téměř žádné světlo oblohy: po setmění práci odvedou lampy a světlomety. */
 const NIGHT_AMBIENT: [number, number, number] = [0.015, 0.018, 0.028];
-/** Thicker than by day, so unlit streets sink into the dark. */
+/** Hustší než ve dne, aby neosvětlené ulice zapadly do tmy. */
 const NIGHT_FOG_DENSITY = 0.006;
-/** Low warm light at sunrise and sunset: tints the sun and glows on the horizon. */
+/** Nízké teplé světlo při východu a západu slunce: tónuje slunce a září na obzoru. */
 const DUSK_SUN: [number, number, number] = [1.0, 0.55, 0.3];
 const DUSK_GLOW: [number, number, number] = [0.45, 0.2, 0.08];
 
@@ -35,13 +35,13 @@ export interface RenderStats {
   triangles: number;
 }
 
-/** The time of day, as `daylightAt` gives it, and the lights to shade with. */
+/** Denní doba, jak ji vrací `daylightAt`, a světla pro stínování. */
 export interface SceneState {
   daylight: number;
   dusk: number;
-  /** How far up lamp glass glows. */
+  /** Jak moc září sklo lamp. */
   lightsOn: number;
-  /** Already narrowed to what the shaders can take; see `nearestLights`. */
+  /** Už zúžené na to, co shadery zvládnou; viz `nearestLights`. */
   lights: readonly SpotLight[];
 }
 
@@ -106,11 +106,11 @@ export class Renderer {
     camera.update();
 
     const { daylight, dusk } = scene;
-    // The sun reddens and fades as it sets; sky light and haze follow it down.
+    // Zapadající slunce červená a slábne; světlo oblohy a opar klesají s ním.
     const sunColor = mixRGB(SUN_COLOR, DUSK_SUN, dusk).map((c) => c * daylight) as RGB;
     const ambient = mixRGB(NIGHT_AMBIENT, AMBIENT, daylight);
     const glow = DUSK_GLOW.map((c) => c * dusk) as RGB;
-    // Fog meets the sky at the horizon, so it carries the same glow.
+    // Mlha se na obzoru potkává s oblohou, takže nese stejnou záři.
     const fogColor = mixRGB(NIGHT_HORIZON_COLOR, this.sky.horizonColor, daylight).map(
       (c, i) => c + (glow[i] ?? 0),
     ) as RGB;

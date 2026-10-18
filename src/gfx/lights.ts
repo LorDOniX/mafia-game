@@ -1,26 +1,26 @@
 import type { Vec3 } from '@/math/vec3';
 import lightsSource from '@/shaders/lights.glsl?raw';
 
-/** Must match MAX_LIGHTS in lights.glsl. */
+/** Musí odpovídat MAX_LIGHTS v lights.glsl. */
 export const MAX_LIGHTS = 32;
 
 export type RGB = readonly [number, number, number];
 
-/** A cone of light: street lamps pointing down, headlights pointing ahead. */
+/** Kužel světla: pouliční lampy míří dolů, světlomety dopředu. */
 export interface SpotLight {
   position: Vec3;
-  /** Unit vector along the middle of the cone. */
+  /** Jednotkový vektor podél středu kužele. */
   direction: Vec3;
-  /** Colour times intensity; brightness falls off with the square of distance. */
+  /** Barva krát intenzita; jas klesá se čtvercem vzdálenosti. */
   color: RGB;
-  /** Beyond this, metres, the light reaches nothing at all. */
+  /** Za touto vzdáleností, v metrech, už světlo nedosáhne vůbec nic. */
   range: number;
-  /** Half-angles, radians: full strength inside `inner`, fading to zero at `outer`. */
+  /** Poloviční úhly, radiány: plná síla uvnitř `inner`, slábne až k nule u `outer`. */
   inner: number;
   outer: number;
 }
 
-/** Splices the shared spot-light code into a fragment shader at its include line. */
+/** Vloží sdílený kód bodových světel do fragment shaderu na místo řádku s include. */
 export function withLights(source: string): string {
   const marker = '#include "lights.glsl"';
   if (!source.includes(marker)) throw new Error('Shader has no lights include');
@@ -28,11 +28,11 @@ export function withLights(source: string): string {
 }
 
 /**
- * The `max` lights nearest `from`, dimmed toward the edge of the chosen set.
+ * `max` světel nejbližších k `from`, ztlumených směrem k okraji vybrané sady.
  *
- * Only so many lights fit in a shader, so which ones are on changes as the
- * camera moves; fading the farthest ones out first means a light swapped in or
- * out is already dark at that moment, rather than popping.
+ * Do shaderu se vejde jen omezený počet světel, takže se s pohybem kamery mění,
+ * která jsou zapnutá; postupné ztlumení těch nejvzdálenějších znamená, že světlo,
+ * které se přidá nebo odebere, je v tu chvíli už tmavé, místo aby náhle bliklo.
  */
 export function nearestLights(
   lights: readonly SpotLight[],
@@ -56,7 +56,7 @@ export function nearestLights(
   });
 }
 
-/** Packs lights into the three vec4 arrays lights.glsl reads. */
+/** Zabalí světla do tří polí vec4, která čte lights.glsl. */
 export class LightBuffer {
   readonly position = new Float32Array(MAX_LIGHTS * 4);
   readonly direction = new Float32Array(MAX_LIGHTS * 4);

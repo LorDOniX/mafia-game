@@ -1,7 +1,7 @@
 export interface GLContext {
   gl: WebGL2RenderingContext;
   canvas: HTMLCanvasElement;
-  /** Resizes the drawing buffer to the CSS size * DPR. Returns true if it changed. */
+  /** Změní velikost drawing bufferu na CSS velikost * DPR. Vrací true, pokud se změnila. */
   resize(): boolean;
 }
 

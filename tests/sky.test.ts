@@ -10,8 +10,8 @@ import { sampleBilinear } from '@/gfx/image';
 import { normalize } from '@/math/vec3';
 
 /**
- * Minimal stand-in for the browser class. The resampling code only needs
- * `width`, `height` and `data`, so this avoids pulling in a DOM environment.
+ * Minimální náhrada za třídu z prohlížeče. Kód pro převzorkování potřebuje jen
+ * `width`, `height` a `data`, takže se tím vyhneme zatažení DOM prostředí.
  */
 if (typeof globalThis.ImageData === 'undefined') {
   globalThis.ImageData = class {
@@ -25,7 +25,7 @@ if (typeof globalThis.ImageData === 'undefined') {
   } as unknown as typeof ImageData;
 }
 
-/** Builds a panorama from a function of normalised (u, v). */
+/** Sestaví panorama z funkce normalizovaných (u, v). */
 function makePanorama(
   width: number,
   height: number,
@@ -49,7 +49,7 @@ function makePanorama(
 
 describe('faceDirection', () => {
   it('points each cube face along its own axis', () => {
-    // The centre texel of every face must look straight down that face's axis.
+    // Středový texel každé stěny musí hledět přímo ve směru osy této stěny.
     expect(faceDirection(0, 0, 0)).toEqual({ x: 1, y: -0, z: -0 });
     expect(faceDirection(1, 0, 0)).toEqual({ x: -1, y: -0, z: 0 });
     expect(faceDirection(2, 0, 0)).toEqual({ x: 0, y: 1, z: 0 });
@@ -59,7 +59,7 @@ describe('faceDirection', () => {
   });
 
   it('spans the full face without leaving gaps at the edges', () => {
-    // Corner texels must reach the cube's corners, i.e. all components +-1.
+    // Rohové texely musí dosáhnout rohů krychle, tj. všechny složky +-1.
     const corner = faceDirection(0, 1, 1);
     expect(Math.abs(corner.x)).toBeCloseTo(1);
     expect(Math.abs(corner.y)).toBeCloseTo(1);
@@ -106,8 +106,8 @@ describe('panoramaToSkyFaces', () => {
   });
 
   /**
-   * The +Y and -Y faces sample opposite poles of the panorama, so a
-   * top/bottom split is the cleanest way to catch a flipped vertical axis.
+   * Stěny +Y a -Y vzorkují opačné póly panoramatu, takže rozdělení na horní
+   * a dolní polovinu je nejčistší způsob, jak zachytit převrácenou svislou osu.
    */
   it('sends the top of the panorama to the +Y face and the bottom to -Y', () => {
     const panorama = makePanorama(128, 64, (_u, v) => (v < 0.5 ? [255, 0, 0] : [0, 0, 255]));
@@ -124,7 +124,7 @@ describe('panoramaToSkyFaces', () => {
   });
 
   it('keeps longitude oriented so +X and -X land on opposite halves', () => {
-    // Left half of the panorama red, right half green.
+    // Levá polovina panoramatu červená, pravá zelená.
     const panorama = makePanorama(128, 64, (u) => (u < 0.5 ? [255, 0, 0] : [0, 255, 0]));
     const faces = panoramaToSkyFaces(panorama, 4);
 
@@ -132,7 +132,7 @@ describe('panoramaToSkyFaces', () => {
     const minusX = faces[1];
     if (!plusX || !minusX) throw new Error('expected six faces');
 
-    // +X sits at u = 0.75 (green half), -X at u = 0.25 (red half).
+    // +X leží na u = 0.75 (zelená polovina), -X na u = 0.25 (červená polovina).
     expect(plusX.data[1]).toBeGreaterThan(plusX.data[0] ?? 0);
     expect(minusX.data[0]).toBeGreaterThan(minusX.data[1] ?? 0);
   });
@@ -153,7 +153,7 @@ describe('createNightSkyFaces', () => {
   });
 
   it('meets the night fog colour at the horizon', () => {
-    // Middle row of a side face looks straight at the horizon.
+    // Prostřední řádek boční stěny hledí přímo na horizont.
     const side = faces[4];
     if (!side) throw new Error('expected six faces');
     const i = (32 * 64 + 32) * 4;
@@ -180,7 +180,7 @@ describe('sampleBilinear', () => {
 
   it('wraps across the horizontal seam instead of clamping', () => {
     const image = makePanorama(4, 1, (u) => (u < 0.25 ? [255, 0, 0] : [0, 0, 0]));
-    // Just left of u=0 should pick up the red column that wraps around.
+    // Těsně vlevo od u=0 by se měl vybrat červený sloupec, který přetéká z druhé strany.
     sampleBilinear(image, 0.999, 0.5, out);
     expect(out[0]).toBeGreaterThan(0);
   });

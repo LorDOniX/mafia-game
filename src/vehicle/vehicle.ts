@@ -1,20 +1,20 @@
 /**
- * Arcade car handling: a kinematic bicycle model, no physics engine.
+ * Arkádové ovládání auta: kinematický model kola (bicycle model), bez fyzikálního enginu.
  *
- * The car moves along its heading at `speed`, and turns at a rate set by the
- * steering angle and the wheelbase, so it cannot pivot on the spot and swings
- * wide at speed the way a real car does. Collision is a row of circles down
- * the car's long axis, tested against the city's building grid.
+ * Auto se pohybuje ve směru headingu rychlostí `speed` a zatáčí rychlostí danou
+ * úhlem natočení kol a rozvorem, takže se nemůže otočit na místě a ve vysoké
+ * rychlosti vynáší do šířky jako skutečné auto. Kolize řeší řada kruhů podél
+ * podélné osy auta, testovaná proti mřížce budov ve městě.
  *
- * Heading uses the camera's yaw convention: 0 faces -Z and positive turns
- * clockwise seen from above, so positive steering turns right.
+ * Heading používá konvenci yaw kamery: 0 míří na -Z a kladné hodnoty otáčejí
+ * po směru hodinových ručiček při pohledu shora, takže kladné řízení zatáčí vpravo.
  */
 
-/** Physical dimensions, in metres. */
+/** Fyzické rozměry, v metrech. */
 export interface VehicleBody {
   length: number;
   width: number;
-  /** Distance between the front and rear axles; sets the turning circle. */
+  /** Vzdálenost mezi přední a zadní nápravou; určuje poloměr otáčení. */
   wheelbase: number;
   wheelRadius: number;
 }
@@ -26,16 +26,16 @@ export interface VehicleHandling {
   /** m/s^2 */
   acceleration: number;
   braking: number;
-  /** Deceleration when coasting. */
+  /** Zpomalení při jízdě setrvačností. */
   rolling: number;
   handbrake: number;
-  /** Front-wheel angle at a standstill, in radians. */
+  /** Úhel předních kol při stání, v radiánech. */
   maxSteer: number;
-  /** How fast the wheels turn toward the requested angle, rad/s. */
+  /** Jak rychle se kola natáčejí k požadovanému úhlu, rad/s. */
   steerRate: number;
   /**
-   * Speed at which the steering lock halves. Keeps the car drivable at speed,
-   * where full lock would spin it round.
+   * Rychlost, při které se maximální natočení kol sníží na polovinu. Udržuje auto
+   * ovladatelné ve vysoké rychlosti, kde by ho plný rejd roztočil.
    */
   steerFalloff: number;
 }
@@ -53,36 +53,36 @@ export const DEFAULT_HANDLING: VehicleHandling = {
 };
 
 export interface VehicleControls {
-  /** 1 accelerates forward, -1 brakes and then reverses. */
+  /** 1 zrychluje vpřed, -1 brzdí a pak couvá. */
   throttle: number;
-  /** 1 steers right, -1 left. */
+  /** 1 zatáčí vpravo, -1 vlevo. */
   steer: number;
   handbrake: boolean;
 }
 
-/** An empty car: no input, handbrake on, so it rolls to a stop. */
+/** Prázdné auto: žádný vstup, zatažená ruční brzda, takže dojede do zastavení. */
 export const PARKED: VehicleControls = { throttle: 0, steer: 0, handbrake: true };
 
 export interface VehicleWorld {
-  /** True if a circle at (x, z) would overlap something solid. */
+  /** True, pokud by se kruh v (x, z) překrýval s něčím pevným. */
   blocked(x: number, z: number, radius: number): boolean;
   groundHeightAt(x: number, z: number): number;
 }
 
-/** Fraction of speed kept per second while scraping along a wall. */
+/** Podíl rychlosti zachovaný za sekundu při odírání o zeď. */
 const SCRAPE_RETAIN = 0.15;
-/** Fraction of speed bounced back off a head-on hit. */
+/** Podíl rychlosti odražený zpět při čelním nárazu. */
 const BOUNCE = 0.25;
-/** Higher settles onto kerbs faster. */
+/** Vyšší hodnota rychleji usadí auto na obrubník. */
 const SUSPENSION = 12;
 
 export class Vehicle {
   y = 0;
-  /** m/s along the heading; negative is reversing. */
+  /** m/s ve směru headingu; záporná hodnota je couvání. */
   speed = 0;
-  /** Current front-wheel angle, radians. */
+  /** Aktuální úhel předních kol, radiány. */
   steer = 0;
-  /** Accumulated wheel rotation, radians, for drawing. */
+  /** Nasčítané otočení kol, radiány, pro vykreslení. */
   wheelSpin = 0;
 
   constructor(
@@ -121,7 +121,7 @@ export class Vehicle {
     let rate = h.rolling;
 
     if (throttle > 0) {
-      // Pressing forward while rolling backward brakes first.
+      // Plyn vpřed při couvání nejdřív brzdí.
       if (this.speed < 0) rate = h.braking;
       else [target, rate] = [h.maxSpeed * throttle, h.acceleration];
     } else if (throttle < 0) {
@@ -148,7 +148,7 @@ export class Vehicle {
       return;
     }
 
-    // Glancing blow: slide along whichever axis is free, losing speed.
+    // Šikmý náraz: klouzat po ose, která je volná, a ztrácet rychlost.
     const scrape = Math.pow(SCRAPE_RETAIN, dt);
     if (this.fits(nextX, this.z, heading, world)) {
       this.place(nextX, this.z, heading, distance);
@@ -157,7 +157,7 @@ export class Vehicle {
       this.place(this.x, nextZ, heading, distance);
       this.speed *= scrape;
     } else {
-      // Head-on: stay put and bounce back a little.
+      // Čelní náraz: zůstat na místě a trochu se odrazit zpět.
       this.speed *= -BOUNCE;
     }
   }
@@ -169,7 +169,7 @@ export class Vehicle {
     this.wheelSpin += distance / this.body.wheelRadius;
   }
 
-  /** Circles of the car's half-width, spaced to cover its length. */
+  /** Kruhy o poloměru poloviny šířky auta, rozmístěné tak, aby pokryly jeho délku. */
   private fits(x: number, z: number, heading: number, world: VehicleWorld): boolean {
     const { length, width } = this.body;
     const radius = width / 2;
@@ -189,6 +189,6 @@ export class Vehicle {
 const clamp = (value: number, min: number, max: number): number =>
   Math.min(Math.max(value, min), max);
 
-/** Moves `value` toward `target` by at most `step`. */
+/** Posune `value` k `target` nejvýše o `step`. */
 const approach = (value: number, target: number, step: number): number =>
   value < target ? Math.min(value + step, target) : Math.max(value - step, target);

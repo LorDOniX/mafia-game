@@ -1,4 +1,4 @@
-/** How long a message stays up, seconds. */
+/** Jak dlouho zůstane zpráva zobrazená, v sekundách. */
 const MESSAGE_TIME = 2.2;
 const HIT_MARKER_TIME = 0.15;
 
@@ -7,16 +7,16 @@ export interface CombatState {
   magazine: number;
   reloading: boolean;
   score: number;
-  /** Districts taken back, and how many the gang held to start with. */
+  /** Čtvrti získané zpět a kolik jich gang na začátku držel. */
   taken: number;
   total: number;
-  /** The ammo gauge shares its corner with the speedometer. */
+  /** Ukazatel munice sdílí roh s tachometrem. */
   showAmmo: boolean;
-  /** 0 to 1, the red flash after being hit. */
+  /** 0 až 1, červený záblesk po zásahu. */
   hurt: number;
 }
 
-/** The on-screen gauges for the gang war: health, ammo, score, messages, hit feedback. */
+/** Ukazatele na obrazovce pro válku gangů: zdraví, munice, skóre, zprávy, odezva zásahu. */
 export class CombatHud {
   private readonly health: HTMLElement;
   private readonly healthValue: HTMLElement;
@@ -73,7 +73,7 @@ export class CombatHud {
   }
 }
 
-/** Writes only on change, so the DOM is not touched every frame for nothing. */
+/** Zapisuje jen při změně, aby se na DOM zbytečně nesahalo každý snímek. */
 function setText(el: HTMLElement, text: string): void {
   if (el.textContent !== text) el.textContent = text;
 }

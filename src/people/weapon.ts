@@ -10,22 +10,22 @@ import {
 } from '@/math/mat4';
 
 export interface WeaponModel {
-  /** Model units to metres. */
+  /** Jednotky modelu na metry. */
   scale: number;
-  /** +1 if the barrel points down the model's +Z, -1 for -Z. */
+  /** +1, pokud hlaveň míří podél +Z modelu, -1 pro -Z. */
   forward: number;
 }
 
-/** Turns the model so its barrel points down +Z. */
+/** Otočí model tak, aby hlaveň mířila podél +Z. */
 const barrelForward = (weapon: WeaponModel): Mat4 =>
   weapon.forward < 0 ? rotationY(Math.PI) : identity();
 
-/** Where the pistol sits in view: low and to the right, kicked back and up by `kick`. */
+/** Kde je pistole v záběru: nízko a vpravo, odhozená dozadu a nahoru podle `kick`. */
 const HOLD = { right: 0.16, down: 0.16, ahead: 0.4 };
 
 /**
- * The first-person pistol, fixed to the camera. Rotating by pi - yaw turns
- * +Z onto the camera's forward, and the model's +X then lies to its left.
+ * Pistole z pohledu první osoby, pevně spojená s kamerou. Rotace o pi - yaw
+ * natočí +Z do směru vpřed kamery a +X modelu pak leží nalevo od ní.
  */
 export function viewmodelTransform(camera: Camera, weapon: WeaponModel, kick: number): Mat4 {
   const { x, y, z } = camera.position;
@@ -41,12 +41,12 @@ export function viewmodelTransform(camera: Camera, weapon: WeaponModel, kick: nu
 }
 
 /**
- * The pistol in a character's right fist, in the arm's own space: at the end
- * of the arm, barrel running along it, so raising the arm aims it.
- * `bodyScale` is the character model's own scale, which the arm already carries.
+ * Pistole v pravé pěsti postavy, ve vlastním prostoru paže: na konci paže,
+ * hlaveň vede podél ní, takže zvednutí paže ji namíří.
+ * `bodyScale` je vlastní měřítko modelu postavy, které už paže nese.
  */
 export function gripTransform(weapon: WeaponModel, bodyScale: number): Mat4 {
-  // Kenney's blocky arms hang a model unit down from the shoulder, fist at the end.
+  // Kenneyho kostičkové paže visí jednotku modelu pod ramenem, pěst na konci.
   const fist = translate(-0.2, -0.95, 0);
   const alongArm = rotationX(Math.PI / 2);
   return multiply(

@@ -1,13 +1,13 @@
 import { createBuffer } from './buffer';
 
 export interface AttributeLayout {
-  /** Attribute name as declared in the vertex shader. */
+  /** Název atributu, jak je deklarován ve vertex shaderu. */
   name: string;
-  /** Component count (1–4). */
+  /** Počet složek (1–4). */
   size: number;
 }
 
-/** An indexed, static mesh: one VAO, one element buffer, one draw call. */
+/** Indexovaný statický mesh: jeden VAO, jeden element buffer, jeden draw call. */
 export class Mesh {
   private readonly indexCount: number;
 
@@ -28,9 +28,9 @@ export class Mesh {
 }
 
 /**
- * Uploads interleaved vertex data described by `layout`, in declaration order.
- * Attributes the shader optimised away are skipped rather than treated as an
- * error, so unused fields in the vertex format stay harmless.
+ * Nahraje prokládaná vertexová data popsaná `layout` v pořadí deklarace.
+ * Atributy, které shader vyoptimalizoval, se přeskočí místo hlášení chyby,
+ * takže nepoužitá pole ve formátu vertexu zůstávají neškodná.
  */
 export function createMesh(
   gl: WebGL2RenderingContext,

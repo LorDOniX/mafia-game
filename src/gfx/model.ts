@@ -8,7 +8,7 @@ import type { Vec3 } from '@/math/vec3';
 import vertexSource from '@/shaders/model.vert.glsl?raw';
 import fragmentSource from '@/shaders/model.frag.glsl?raw';
 
-/** A model uploaded to the GPU: one mesh per part, sharing one texture. */
+/** Model nahraný na GPU: jeden mesh na část, všechny sdílejí jednu texturu. */
 export interface Model {
   parts: Array<{
     name: string;
@@ -21,21 +21,21 @@ export interface Model {
   doubleSided: boolean;
 }
 
-/** One placement of a model in the world. */
+/** Jedno umístění modelu ve světě. */
 export interface ModelInstance {
   model: Model;
-  /** Model to world. */
+  /** Z modelu do světa. */
   transform: Mat4;
   /**
-   * Extra transform per part, applied in the part's own space — around its
-   * node origin, which is where a wheel's axle sits. Null leaves it at rest.
+   * Další transformace pro každou část, aplikovaná ve vlastním prostoru části — kolem
+   * počátku jejího uzlu, kde leží osa kola. Null ji nechá v klidu.
    */
   pose?: (part: string) => Mat4 | null;
 }
 
 type RGB = readonly [number, number, number];
 
-/** Light and fog shared with the city pass, so models match their surroundings. */
+/** Světlo a mlha sdílené s průchodem města, aby modely ladily s okolím. */
 export interface Lighting {
   cameraPos: Vec3;
   sunDir: Vec3;
@@ -44,7 +44,7 @@ export interface Lighting {
   fogColor: RGB;
   fogDensity: number;
   lights: LightBuffer;
-  /** 1 with the lights on, 0 by day: scales every part's glow. */
+  /** 1 při rozsvícených světlech, 0 ve dne: škáluje záři každé části. */
   emissiveScale: number;
 }
 

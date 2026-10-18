@@ -2,11 +2,11 @@ import { FLOATS_PER_MODEL_VERTEX, type ModelData } from './gltf';
 import { identity, multiply, type Mat4 } from '@/math/mat4';
 
 /**
- * Merges many placements of one model into a single static model, so a
- * thousand trees cost one draw per part instead of one per tree.
+ * Sloučí mnoho umístění jednoho modelu do jediného statického modelu, takže
+ * tisíc stromů stojí jedno vykreslení na část místo jednoho na strom.
  *
- * Normals go through the same matrix, so transforms must be rotations,
- * translations and uniform scales only.
+ * Normály procházejí stejnou maticí, takže transformace smí být jen rotace,
+ * posuny a rovnoměrná měřítka.
  */
 export function bakeInstances(data: ModelData, transforms: readonly Mat4[]): ModelData {
   const F = FLOATS_PER_MODEL_VERTEX;

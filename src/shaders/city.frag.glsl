@@ -17,7 +17,7 @@ uniform vec3 u_sunColor;
 uniform vec3 u_ambient;
 uniform vec3 u_fogColor;
 uniform float u_fogDensity;
-/** Scales normal-map strength; 0 falls back to the flat geometric normal. */
+/** Škáluje sílu normal mapy; 0 se vrací k ploché geometrické normále. */
 uniform float u_normalStrength;
 
 #include "lights.glsl"
@@ -29,29 +29,29 @@ void main() {
 
   vec3 geometric = normalize(v_normal);
 
-  // Tangent-space normal map. The bitangent is rebuilt here rather than passed
-  // per vertex; the handedness sign is all that cannot be recovered.
+  // Normal mapa v tangent space. Bitangenta se zde rekonstruuje místo předávání
+  // pro každý vertex; jediné, co nelze získat zpět, je znaménko orientace.
   vec3 tangent = normalize(v_tangent.xyz);
   vec3 bitangent = cross(geometric, tangent) * v_tangent.w;
   vec3 sampled = texture(u_normals, vec3(v_uv, v_layer)).xyz * 2.0 - 1.0;
 
-  // Flattening xy toward zero eases the effect off without renormalising the
-  // map itself, so one uniform can dial it down globally.
+  // Zploštění xy směrem k nule efekt zmírní bez renormalizace samotné mapy,
+  // takže jeden uniform ho může globálně ztlumit.
   sampled.xy *= u_normalStrength;
   vec3 n = normalize(mat3(tangent, bitangent, geometric) * sampled);
 
   float sun = max(dot(n, u_sunDir), 0.0);
-  // Cheap sky bounce: up-facing surfaces collect more ambient than down-facing.
+  // Levný odraz od oblohy: plochy obrácené nahoru sbírají víc ambientu než ty dolů.
   float sky = 0.5 + 0.5 * n.y;
 
   vec3 lit = albedo * (u_ambient * sky + u_sunColor * sun + spotLights(v_worldPos, n));
 
-  // Exponential-squared fog, tuned to match the skybox horizon so the city
-  // dissolves into the sky instead of ending at a hard edge.
+  // Exponenciálně-kvadratická mlha naladěná na obzor skyboxu, aby se město
+  // rozplynulo v obloze místo končení ostrou hranou.
   //
-  // Distance is measured per fragment rather than interpolated from the
-  // vertices: the roadway is a single map-sized quad, so vertex distances are
-  // hundreds of metres even directly under the camera.
+  // Vzdálenost se měří pro každý fragment, ne interpolací z vertexů: vozovka je
+  // jediný quad velikosti mapy, takže vzdálenosti vertexů jsou stovky metrů
+  // i přímo pod kamerou.
   float dist = distance(v_worldPos, u_cameraPos);
   float fog = 1.0 - exp(-pow(dist * u_fogDensity, 2.0));
 

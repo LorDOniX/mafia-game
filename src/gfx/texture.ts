@@ -4,10 +4,10 @@ type AnisotropyExt = {
 };
 
 /**
- * Applies the highest anisotropy the driver offers, if the extension exists.
+ * Použije nejvyšší anizotropii, kterou ovladač nabízí, pokud rozšíření existuje.
  *
- * Ground planes are viewed at grazing angles almost all the time; without this
- * the road and sidewalk blur into mush a few metres ahead of the camera.
+ * Na plochy země se téměř pořád díváme pod ostrým úhlem; bez toho by se silnice
+ * a chodník pár metrů před kamerou rozmazaly na kaši.
  */
 export function applyMaxAnisotropy(gl: WebGL2RenderingContext, target: number): void {
   const ext = gl.getExtension('EXT_texture_filter_anisotropic') as AnisotropyExt | null;
@@ -20,14 +20,15 @@ export function applyMaxAnisotropy(gl: WebGL2RenderingContext, target: number): 
 const mipLevels = (size: number): number => Math.floor(Math.log2(size)) + 1;
 
 /**
- * Packs equally sized canvases into a TEXTURE_2D_ARRAY.
+ * Zabalí stejně velké canvasy do TEXTURE_2D_ARRAY.
  *
- * An array beats a classic atlas here: every layer keeps its own REPEAT wrap
- * and its own mip chain, so tiled facades cannot bleed into their neighbours.
+ * Texture array je tu lepší než klasický atlas: každá vrstva si drží vlastní
+ * REPEAT wrap a vlastní řetězec mipmap, takže opakované fasády nemohou prosakovat do
+ * sousedů.
  *
- * Canvases are uploaded flipped, so the bottom row of an image sits at v = 0
- * as GL expects. Walls run v upward from the ground, so facades stand the right
- * way up, and OpenGL-convention normal maps get green pointing toward +v.
+ * Canvasy se nahrávají převrácené, takže spodní řádek obrázku leží na v = 0,
+ * jak GL očekává. Na stěnách roste v od země nahoru, takže fasády stojí správně
+ * a normal mapy v konvenci OpenGL mají zelenou směrem k +v.
  */
 export function createTextureArray(
   gl: WebGL2RenderingContext,
@@ -57,7 +58,7 @@ export function createTextureArray(
     );
   });
 
-  // Unpack state is global; the sky cube map must not inherit the flip.
+  // Stav unpack je globální; cube mapa oblohy nesmí převrácení zdědit.
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
   gl.generateMipmap(gl.TEXTURE_2D_ARRAY);
   gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
@@ -70,7 +71,7 @@ export function createTextureArray(
   return texture;
 }
 
-/** Faces must be supplied in GL order: +X, -X, +Y, -Y, +Z, -Z. */
+/** Stěny je nutné dodat v pořadí GL: +X, -X, +Y, -Y, +Z, -Z. */
 export function createCubeMap(
   gl: WebGL2RenderingContext,
   faces: ImageData[],
@@ -88,7 +89,7 @@ export function createCubeMap(
     gl.texSubImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, face);
   });
 
-  // The sky is always at the far plane, so mipmaps would never be selected.
+  // Obloha je vždy na vzdálené rovině, takže mipmapy by se nikdy nevybraly.
   gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -100,11 +101,11 @@ export function createCubeMap(
 }
 
 /**
- * A plain mipmapped 2D texture, for models.
+ * Obyčejná 2D textura s mipmapami, pro modely.
  *
- * Uploaded unflipped on purpose: glTF puts UV (0, 0) at the top-left of the
- * image, which is exactly where an unflipped upload leaves the first row.
- * `null` gives a 1x1 white texture, so untextured models still draw.
+ * Záměrně nahrávaná nepřevrácená: glTF umísťuje UV (0, 0) do levého horního rohu
+ * obrázku, což je přesně tam, kde nepřevrácené nahrání nechá první řádek.
+ * `null` dá bílou texturu 1x1, takže se vykreslí i modely bez textury.
  */
 export function createTexture2D(
   gl: WebGL2RenderingContext,

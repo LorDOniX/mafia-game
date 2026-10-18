@@ -3,7 +3,7 @@ import type { Rng } from '@/core/rng';
 import type { Vec3 } from '@/math/vec3';
 import { Body, EYE_HEIGHT } from './body';
 
-/** What a gangster needs from the city: lines of sight and where it may walk. */
+/** Co gangster potřebuje od města: přímé viditelnosti a kudy smí chodit. */
 export interface GangsterWorld {
   raycast(origin: Vec3, direction: Vec3, maxDistance: number): number;
   resolve(
@@ -17,14 +17,14 @@ export interface GangsterWorld {
 }
 
 export interface Target {
-  /** Eye position. */
+  /** Pozice očí. */
   position: Vec3;
   alive: boolean;
-  /** Harder to hit behind glass and steel. */
+  /** Za sklem a plechem hůř zasažitelný. */
   inCar: boolean;
 }
 
-/** A shot a gangster fired this frame. */
+/** Výstřel, který gangster vypálil v tomto snímku. */
 export interface EnemyShot {
   from: Vec3;
   direction: Vec3;
@@ -34,29 +34,29 @@ export interface EnemyShot {
 
 export const GANGSTER_HEALTH = 100;
 const SIGHT_RANGE = 40;
-/** How often a gangster looks for the player, seconds; rays are not free. */
+/** Jak často gangster hledá hráče, sekundy; paprsky nejsou zadarmo. */
 const LOOK_INTERVAL = 0.25;
-/** Gives up the chase after this long without seeing the player. */
+/** Vzdá pronásledování, pokud hráče takto dlouho nevidí. */
 const FORGET_AFTER = 6;
 const WALK_SPEED = 1.4;
 const RUN_SPEED = 3.2;
 const TURN_RATE = 4;
-/** Combat range: closes in beyond the far edge, holds ground inside it. */
+/** Bojová vzdálenost: za vzdálenou hranou se přibližuje, uvnitř drží pozici. */
 const ENGAGE_DISTANCE = 14;
 const RADIUS = 0.35;
-/** Heading error, radians, within which a gangster will fire. */
+/** Odchylka headingu, radiány, v rámci které gangster vystřelí. */
 const AIM_TOLERANCE = 0.2;
 const FIRE_INTERVAL = { min: 0.9, max: 1.7 };
 const DAMAGE = { min: 8, max: 14 };
-/** Reaction time before the first shot, seconds. */
+/** Reakční doba před prvním výstřelem, sekundy. */
 const DRAW_TIME = 0.8;
 
 type State = 'patrol' | 'combat' | 'dead';
 
 /**
- * A member of the rival gang: strolls the sidewalk round its block until it
- * spots the player, then turns, raises its pistol, closes in and fires, until
- * one of them goes down or it loses the player for long enough.
+ * Člen konkurenčního gangu: prochází se po chodníku kolem svého bloku, dokud
+ * nezahlédne hráče, pak se otočí, zvedne pistoli, přiblíží se a střílí, dokud
+ * jeden z nich nepadne nebo dokud hráče dostatečně dlouho neztratí z očí.
  */
 export class Gangster {
   readonly body = new Body();
@@ -72,7 +72,7 @@ export class Gangster {
   private stuck = 0;
 
   constructor(
-    /** Its block's sidewalk; it patrols the ring between this and the plot. */
+    /** Chodník jeho bloku; hlíduje v prstenci mezi ním a pozemkem. */
     readonly sidewalk: Rect,
     readonly plot: Rect,
     rng: Rng,
@@ -90,7 +90,7 @@ export class Gangster {
     return this.state !== 'dead';
   }
 
-  /** Takes a hit; returns true if it was the killing one. */
+  /** Utrží zásah; vrátí true, pokud byl smrtelný. */
   damage(amount: number): boolean {
     if (!this.alive) return false;
     this.health -= amount;
@@ -100,13 +100,13 @@ export class Gangster {
       this.body.aim = 0;
       return true;
     }
-    // Being shot gives the shooter away.
+    // Zásah prozradí střelce.
     this.state = 'combat';
     this.sinceSeen = 0;
     return false;
   }
 
-  /** Calls off the hunt, as after the player dies and respawns elsewhere. */
+  /** Odvolá hon, např. poté, co hráč zemře a ožije jinde. */
   standDown(): void {
     if (!this.alive) return;
     this.state = 'patrol';
@@ -186,7 +186,7 @@ export class Gangster {
     const dy = player.position.y - 0.3 - from.y;
     const dz = player.position.z - from.z;
     const length = Math.hypot(dx, dy, dz) || 1;
-    // Long shots and shots into a car miss more often.
+    // Dlouhé výstřely a výstřely do auta častěji minou.
     const chance = clamp(0.75 - distance / 45, 0.12, 0.75) * (player.inCar ? 0.6 : 1);
     return {
       from,
@@ -200,7 +200,7 @@ export class Gangster {
     return { x: this.body.x, y: this.body.y + EYE_HEIGHT, z: this.body.z };
   }
 
-  /** Roughly where the pistol's muzzle is, arm raised. */
+  /** Přibližná poloha ústí hlavně pistole se zvednutou paží. */
   muzzle(): Vec3 {
     const f = this.body.forward();
     return {
@@ -210,7 +210,7 @@ export class Gangster {
     };
   }
 
-  /** Turns toward `heading`; returns how far off it still is. */
+  /** Otočí se k `heading`; vrátí, o kolik se ještě odchyluje. */
   private turnToward(heading: number, dt: number): number {
     const error = wrapAngle(heading - this.body.heading);
     const step = TURN_RATE * dt;
@@ -239,7 +239,7 @@ export class Gangster {
     body.animate(dt, speed);
   }
 
-  /** A spot on the sidewalk ring round the block, clear of the plot. */
+  /** Místo na prstenci chodníku kolem bloku, mimo pozemek. */
   private randomSidewalkPoint(rng: Rng): { x: number; z: number } {
     const s = this.sidewalk;
     const p = this.plot;

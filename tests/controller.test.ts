@@ -5,7 +5,7 @@ import type { Input } from '@/core/input';
 import { generateCity } from '@/city/layout';
 import { CityCollision } from '@/city/collision';
 
-/** Just enough of `Input` for the controller, with Space pressed on demand. */
+/** Jen tolik z `Input`, kolik controller potřebuje, se Space stisknutým na požádání. */
 function fakeInput(): { input: Input; press: (code: string) => void; endFrame: () => void } {
   const pressed = new Set<string>();
   const input = {

@@ -1,18 +1,18 @@
 export interface Rng {
-  /** Uniform in [0, 1). */
+  /** Rovnoměrně v [0, 1). */
   next(): number;
-  /** Uniform in [min, max). */
+  /** Rovnoměrně v [min, max). */
   range(min: number, max: number): number;
-  /** Integer in [min, max]. */
+  /** Celé číslo v [min, max]. */
   int(min: number, max: number): number;
   pick<T>(items: readonly T[]): T;
   chance(probability: number): boolean;
 }
 
 /**
- * mulberry32 — small, fast, and deterministic. The city layout is regenerated
- * from a seed rather than stored, so the same seed must always give the same
- * city across runs and platforms.
+ * mulberry32 — malý, rychlý a deterministický. Rozvržení města se generuje
+ * znovu ze seedu místo ukládání, takže stejný seed musí vždy dát stejné město
+ * napříč běhy i platformami.
  */
 export function createRng(seed: number): Rng {
   let state = seed >>> 0;

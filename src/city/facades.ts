@@ -7,53 +7,53 @@ import {
   type SurfaceLayer,
 } from './layout';
 
-/** Which buildings a custom facade goes on. */
+/** Na které budovy se vlastní fasáda použije. */
 export type FacadeTarget =
   /**
-   * The building standing on this ground point. Walk up to the one you want
-   * and read `x` / `z` off the HUD.
+   * Budova stojící na tomto bodu terénu. Dojděte k té, kterou chcete,
+   * a odčtěte `x` / `z` z HUD.
    */
   | { at: { x: number; z: number } }
   /**
-   * Every building the predicate accepts. `index` is the building's position
-   * in `layout.buildings`, which is stable for a given seed.
+   * Každá budova, kterou predikát přijme. `index` je pozice budovy
+   * v `layout.buildings`, která je pro daný seed stabilní.
    */
   | { where: (building: Building, index: number) => boolean };
 
 /**
- * A facade texture of your own, for picked buildings.
+ * Vlastní textura fasády pro vybrané budovy.
  *
- * Unlike the built-in facades, which are one window bay per tile, a custom
- * facade can be a whole photographed wall: `span` says how many bays and
- * storeys the image covers, and the walls are mapped so each bay of the image
- * lands on one bay of the building. Crop the image to exactly that grid, or the
- * repeats will not line up.
+ * Na rozdíl od vestavěných fasád, které mají jednu okenní osu na dlaždici, může
+ * být vlastní fasáda celá vyfocená stěna: `span` udává, kolik os a podlaží
+ * obrázek pokrývá, a stěny se mapují tak, aby každá osa obrázku padla na jednu
+ * osu budovy. Ořízněte obrázek přesně na tuto mřížku, jinak opakování nebudou
+ * lícovat.
  */
 export interface CustomFacade {
-  /** Used in warnings only. */
+  /** Používá se jen ve varováních. */
   name: string;
-  /** Colour map, served from `public/`. */
+  /** Barevná mapa, servírovaná z `public/`. */
   url: string;
-  /** Optional tangent-space normal map, OpenGL convention. Flat if omitted. */
+  /** Volitelná normal mapa v tangent space, konvence OpenGL. Když chybí, je plochá. */
   normalUrl?: string;
   span: FacadeSpan;
   /**
-   * Multiplied over the texture. Defaults to white: photographs carry their
-   * own colour, unlike the procedural facades that rely on per-building tints.
+   * Násobí texturu. Výchozí je bílá: fotografie mají vlastní barvu, na rozdíl
+   * od procedurálních fasád, které spoléhají na tónování jednotlivých budov.
    */
   tint?: readonly [number, number, number];
   targets: readonly FacadeTarget[];
 }
 
-/** Texture-array layer of the `index`-th custom facade. */
+/** Vrstva texture array pro `index`-tou vlastní fasádu. */
 export const customFacadeLayer = (index: number): SurfaceLayer => BUILTIN_LAYER_COUNT + index;
 
 /**
- * Puts custom facades on the buildings their targets pick, in place.
+ * Umístí vlastní fasády na budovy vybrané jejich cíli, na místě.
  *
- * Facades apply in order, so when two target the same building the later one
- * wins. A target that matches nothing warns rather than throws: it most likely
- * means the city layout changed under it.
+ * Fasády se aplikují popořadě, takže když dvě cílí na stejnou budovu, vyhraje
+ * ta pozdější. Cíl, který nic neodpovídá, vypíše varování místo výjimky: nejspíš
+ * to znamená, že se pod ním změnilo rozvržení města.
  */
 export function applyCustomFacades(layout: CityLayout, facades: readonly CustomFacade[]): void {
   facades.forEach((facade, index) => {

@@ -56,9 +56,9 @@ const cross = (
 ];
 
 /**
- * True if stepping between two corners that differ only in `axis` moves along
- * `expected` in world space. Every quad the builder emits maps to an
- * axis-aligned rectangle in UV space, so such a pair always exists.
+ * True, pokud krok mezi dvěma rohy, které se liší jen v `axis`, vede ve world space
+ * ve směru `expected`. Každý quad, který builder vytvoří, se mapuje na osově
+ * zarovnaný obdélník v UV prostoru, takže taková dvojice vždy existuje.
  */
 function alignedWith(
   corners: Vertex[],
@@ -78,8 +78,8 @@ function alignedWith(
       const len = Math.hypot(dx, dy, dz);
       if (len < 1e-6) continue;
 
-      // Unit displacement must match the expected axis exactly, not merely
-      // lean the same way, so a rotated frame still fails.
+      // Jednotkový posun musí přesně odpovídat očekávané ose, nejen se naklánět
+      // stejným směrem, aby otočený frame stále selhal.
       const alignment =
         (dx / len) * expected[0] + (dy / len) * expected[1] + (dz / len) * expected[2];
       return Math.abs(alignment - 1) < 1e-3;
@@ -119,8 +119,8 @@ describe('buildCityMesh', () => {
   });
 
   /**
-   * Backface culling is on, so a triangle whose winding disagrees with its
-   * stored normal would be invisible from the side it is meant to face.
+   * Backface culling je zapnutý, takže trojúhelník, jehož winding nesouhlasí
+   * s uloženou normálou, by byl neviditelný ze strany, ke které má směřovat.
    */
   it('winds every triangle to agree with its stored normal', () => {
     for (let i = 0; i < mesh.indices.length; i += 3) {
@@ -132,7 +132,7 @@ describe('buildCityMesh', () => {
       const len = Math.hypot(...geometric);
 
       expect(len).toBeGreaterThan(0);
-      // Same direction as the normal the shader will light with.
+      // Stejný směr jako normála, se kterou bude shader osvětlovat.
       const alignment =
         (geometric[0] / len) * a.nx + (geometric[1] / len) * a.ny + (geometric[2] / len) * a.nz;
       expect(alignment).toBeCloseTo(1, 3);
@@ -144,20 +144,20 @@ describe('buildCityMesh', () => {
       const v = readVertex(mesh.vertices, i);
 
       expect(Math.hypot(v.tx, v.ty, v.tz)).toBeCloseTo(1, 4);
-      // A tangent off the surface plane would skew the whole TBN basis.
+      // Tangenta mimo rovinu povrchu by zkreslila celou TBN bázi.
       expect(dot(v, [v.tx, v.ty, v.tz])).toBeCloseTo(0, 4);
       expect(Math.abs(v.handedness)).toBe(1);
     }
   });
 
   /**
-   * The tangent frame has to describe where the texture axes point in world
-   * space. Checking that against the quad's own UVs catches a frame that is
-   * rotated or mirrored, which would light normal-mapped detail from the wrong
-   * side. Asserted as a property rather than by re-deriving the solve.
+   * Tangent frame musí popisovat, kam ve world space míří osy textury.
+   * Kontrola vůči vlastním UV quadu zachytí frame, který je otočený nebo
+   * zrcadlený, což by osvětlilo normal-mapované detaily ze špatné strany.
+   * Ověřuje se jako vlastnost, ne opětovným odvozením řešení.
    */
   it('aligns the tangent frame with the direction the UVs increase', () => {
-    // Quads are emitted as four consecutive vertices.
+    // Quady se vytvářejí jako čtyři po sobě jdoucí vrcholy.
     for (let base = 0; base < vertexCount; base += 4) {
       const corners = [0, 1, 2, 3].map((i) => readVertex(mesh.vertices, base + i));
       const c0 = corners[0];
@@ -177,7 +177,7 @@ describe('buildCityMesh', () => {
 });
 
 describe('building walls', () => {
-  /** A single isolated building, so every wall has open air on its outer side. */
+  /** Jedna samostatná budova, takže každá stěna má na vnější straně volný prostor. */
   const building: Building = {
     footprint: { minX: 100, maxX: 112, minZ: 200, maxZ: 214 },
     height: 18,
@@ -215,12 +215,12 @@ describe('building walls', () => {
     for (let i = 0; i < mesh.vertices.length / FLOATS_PER_VERTEX; i++) {
       const v = readVertex(mesh.vertices, i);
 
-      // Facade corners are the only vertices at roof height with a sideways
-      // normal; the kerb and ground quads sit far below.
+      // Rohy fasády jsou jediné vrcholy ve výšce střechy s normálou do strany;
+      // quady obrubníku a země leží hluboko pod nimi.
       if (Math.abs(v.ny) > 0.01 || v.y < building.height - 0.01) continue;
 
-      // Outward means the normal has a positive component along the vector
-      // from the building's centre to this corner.
+      // Ven znamená, že normála má kladnou složku ve směru vektoru
+      // od středu budovy k tomuto rohu.
       const away = v.nx * (v.x - centreX) + v.nz * (v.z - centreZ);
       expect(away).toBeGreaterThan(0);
 

@@ -7,7 +7,7 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
-  // .glsl files are imported with `?raw` and inlined as strings.
+  // Soubory .glsl se importují s `?raw` a vkládají se inline jako řetězce.
   assetsInclude: ['**/*.glsl'],
   server: {
     port: 5173,

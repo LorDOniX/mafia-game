@@ -1,14 +1,14 @@
-/** Rounds in a full magazine. */
+/** Nábojů v plném zásobníku. */
 export const MAGAZINE = 8;
 const FIRE_INTERVAL = 0.22;
 const RELOAD_TIME = 1.4;
-/** How fast the recoil kick settles, per second. */
+/** Jak rychle odeznívá zpětný ráz, za sekundu. */
 const KICK_RECOVERY = 7;
 
-/** The player's pistol: a magazine, a rate of fire and a reload; reserve ammo is endless. */
+/** Hráčova pistole: zásobník, kadence a přebíjení; zásoba munice je nekonečná. */
 export class Pistol {
   magazine = MAGAZINE;
-  /** 1 right after a shot, easing back to 0, for the viewmodel and the camera. */
+  /** 1 hned po výstřelu, plynule klesá k 0, pro viewmodel a kameru. */
   kick = 0;
   private cooldown = 0;
   private reloadLeft = 0;
@@ -26,7 +26,7 @@ export class Pistol {
     }
   }
 
-  /** Pulls the trigger; true if a round went off. An empty pistol reloads instead. */
+  /** Zmáčkne spoušť; true, pokud náboj vyšel. Prázdná pistole místo toho přebíjí. */
   trigger(): boolean {
     if (this.reloading || this.cooldown > 0) return false;
     if (this.magazine === 0) {

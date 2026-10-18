@@ -6,7 +6,7 @@ import { SKY_FACE_SIZE } from '@/city/sky';
 import vertexSource from '@/shaders/skybox.vert.glsl?raw';
 import fragmentSource from '@/shaders/skybox.frag.glsl?raw';
 
-/** Unit cube centred on the origin; only positions are needed. */
+/** Jednotková krychle se středem v počátku; stačí jen pozice. */
 const CUBE_VERTICES = new Float32Array([
   -1, -1, -1, 1, -1, -1, 1, 1, -1, -1, 1, -1, -1, -1, 1, 1, -1, 1, 1, 1, 1, -1, 1, 1,
 ]);
@@ -38,10 +38,10 @@ export class Skybox {
   }
 
   /**
-   * Draw last, after opaque geometry: the depth test then rejects every sky
-   * fragment the city already covers instead of shading it twice.
+   * Kreslit naposled, po neprůhledné geometrii: depth test pak zahodí každý
+   * fragment oblohy, který už město zakrývá, místo aby se stínoval dvakrát.
    *
-   * `night` crossfades to the night sky; `glow` is added low on the horizon.
+   * `night` prolíná do noční oblohy; `glow` se přičítá nízko nad obzorem.
    */
   render(
     view: Mat4,
@@ -51,8 +51,8 @@ export class Skybox {
   ): void {
     const { gl } = this;
 
-    // Dropping the translation column pins the cube to the camera, so the sky
-    // stays infinitely far away however far the player walks.
+    // Odstranění sloupce posunu připne krychli ke kameře, takže obloha zůstává
+    // nekonečně daleko, ať hráč dojde kamkoli.
     stripTranslation(view, this.viewNoTranslate);
     multiply(projection, this.viewNoTranslate, this.viewProj);
 
