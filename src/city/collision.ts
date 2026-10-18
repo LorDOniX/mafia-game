@@ -4,6 +4,12 @@ const CELL_SIZE = 20;
 /** Half the side of the square that stands in for a tree trunk. */
 export const TRUNK_RADIUS = 0.3;
 export const LAMP_POST_RADIUS = 0.15;
+/** Heights for shots and sight lines, metres; buildings carry their own. */
+const TRUNK_HEIGHT = 3;
+const LAMP_POST_HEIGHT = 5.3;
+const CAR_HEIGHT = 1.6;
+/** How finely a ray is stepped through the world, metres. */
+const RAY_STEP = 0.2;
 
 /** A box that moves: a car's footprint, in the vehicle heading convention. */
 export interface Obstacle {
@@ -13,6 +19,8 @@ export interface Obstacle {
   heading: number;
   halfLength: number;
   halfWidth: number;
+  /** How tall it stands, for rays; a car's height if left out. */
+  height?: number;
   /** Whatever the obstacle stands for, so a car can ignore its own box. */
   owner?: unknown;
 }
@@ -26,6 +34,7 @@ export interface Obstacle {
  */
 export class CityCollision {
   private readonly cells = new Map<number, Rect[]>();
+  private readonly heights = new Map<Rect, number>();
   private readonly columns: number;
   private readonly bounds: Rect;
   private obstacles: readonly Obstacle[] = [];
@@ -42,6 +51,9 @@ export class CityCollision {
     });
     const trunks = layout.trees.map(({ x, z }) => post(x, z, TRUNK_RADIUS));
     const lampPosts = layout.lamps.map(({ x, z }) => post(x, z, LAMP_POST_RADIUS));
+    for (const b of layout.buildings) this.heights.set(b.footprint, b.height);
+    for (const t of trunks) this.heights.set(t, TRUNK_HEIGHT);
+    for (const l of lampPosts) this.heights.set(l, LAMP_POST_HEIGHT);
 
     for (const rect of [...layout.buildings.map((b) => b.footprint), ...trunks, ...lampPosts]) {
       const minI = this.cellIndex(rect.minX);
@@ -140,6 +152,33 @@ export class CityCollision {
       x: clamp(x, this.bounds.minX + radius, this.bounds.maxX - radius),
       z: clamp(z, this.bounds.minZ + radius, this.bounds.maxZ - radius),
     };
+  }
+
+  /**
+   * How far a ray travels before it hits the ground, a building, trunk, post
+   * or car, up to `maxDistance`. Used for shots and for lines of sight.
+   */
+  raycast(
+    origin: { x: number; y: number; z: number },
+    direction: { x: number; y: number; z: number },
+    maxDistance: number,
+    ignore?: unknown,
+  ): number {
+    for (let d = 0; d < maxDistance; d += RAY_STEP) {
+      const x = origin.x + direction.x * d;
+      const y = origin.y + direction.y * d;
+      const z = origin.z + direction.z * d;
+      if (y < 0) return d;
+      for (const rect of this.candidates(x, z, 0)) {
+        if (y <= (this.heights.get(rect) ?? 0) && rectContains(rect, x, z)) return d;
+      }
+      for (const o of this.obstacles) {
+        if (o.owner !== ignore && y <= (o.height ?? CAR_HEIGHT) && circleHitsObstacle(x, z, 0.01, o)) {
+          return d;
+        }
+      }
+    }
+    return maxDistance;
   }
 
   /** Sidewalks and plazas sit a kerb above the roadway. */

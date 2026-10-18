@@ -34,6 +34,16 @@ export interface MapCar {
   color: string;
 }
 
+/** Tinted areas (districts) and dots (people) drawn over the map. */
+export interface MapMarks {
+  areas: ReadonlyArray<{ rect: Rect; color: string }>;
+  dots: ReadonlyArray<{ x: number; z: number; color: string }>;
+}
+
+const NO_MARKS: MapMarks = { areas: [], dots: [] };
+/** Radius of a person's dot, metres. */
+const DOT_RADIUS = 1.6;
+
 /** North-up minimap centred on the camera, with its view cone and every car. */
 export class Minimap {
   private readonly ctx: CanvasRenderingContext2D;
@@ -49,7 +59,7 @@ export class Minimap {
     this.city = bakeCity(layout);
   }
 
-  draw(view: MapView, cars: readonly MapCar[]): void {
+  draw(view: MapView, cars: readonly MapCar[], marks: MapMarks = NO_MARKS): void {
     const { canvas, ctx } = this;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const size = Math.round(canvas.clientWidth * dpr);
@@ -67,6 +77,11 @@ export class Minimap {
     ctx.setTransform(scale, 0, 0, scale, size / 2 - view.x * scale, size / 2 - view.z * scale);
     ctx.imageSmoothingEnabled = true;
     ctx.drawImage(this.city, 0, 0, this.city.width / BAKE_SCALE, this.city.height / BAKE_SCALE);
+
+    for (const { rect, color } of marks.areas) {
+      ctx.fillStyle = color;
+      fillRect(ctx, rect);
+    }
 
     // Canvas angles run clockwise from +X; yaw 0 points up the map.
     const facing = view.yaw - Math.PI / 2;
@@ -90,6 +105,13 @@ export class Minimap {
       ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
       ctx.fillRect(-car.width / 2, -car.length / 2, car.width, car.length * 0.2);
       ctx.restore();
+    }
+
+    for (const dot of marks.dots) {
+      ctx.fillStyle = dot.color;
+      ctx.beginPath();
+      ctx.arc(dot.x, dot.z, DOT_RADIUS, 0, Math.PI * 2);
+      ctx.fill();
     }
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);

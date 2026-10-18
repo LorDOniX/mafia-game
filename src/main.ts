@@ -10,9 +10,11 @@ import {
   ANIMALS,
   ANIMALS_PER_PARK,
   CUSTOM_FACADES,
+  GANGSTER_MODELS,
   loadCityAssets,
   loadOptionalModel,
   PARK_TREES,
+  PISTOL_MODEL,
   STREET_TREES,
   TRAFFIC_CARS,
   TRAFFIC_COUNT,
@@ -46,7 +48,13 @@ import { bakeInstances } from '@/gfx/batch';
 import { MAX_LIGHTS, nearestLights, type SpotLight } from '@/gfx/lights';
 import { flashlight } from '@/core/flashlight';
 import type { Model, ModelInstance } from '@/gfx/model';
-import { identity } from '@/math/mat4';
+import { identity, type Mat4 } from '@/math/mat4';
+import { fitBody, handTransform } from '@/people/body';
+import type { Gangster } from '@/people/gangster';
+import { gripTransform, viewmodelTransform } from '@/people/weapon';
+import { DEFAULT_GANG_WAR, GangWar, type Flash } from '@/game/gangwar';
+import { Pistol } from '@/game/pistol';
+import { CombatHud } from '@/ui/combat-hud';
 
 const HUD_INTERVAL = 0.25;
 const PLAYER_CAR_COLOR = '#e0b84a';
@@ -54,6 +62,13 @@ const PLAYER_CAR_COLOR = '#e0b84a';
 const HEADLIGHT_SLOTS = 8;
 /** Room the player takes up on foot, for traffic to stop short of. */
 const PEDESTRIAN_RADIUS = 0.4;
+/** Seconds between going down and getting back up at the start. */
+const RESPAWN_DELAY = 2.5;
+/** Camera kick per shot, radians of pitch. */
+const RECOIL = 0.015;
+/** Muzzle flash: bright, wide and short. */
+const FLASH_COLOR: [number, number, number] = [80, 60, 30];
+const FLASH_RANGE = 14;
 
 /** A car out of traffic: the one the player is driving, or one left parked. */
 interface FreeCar {
@@ -114,13 +129,16 @@ async function main(): Promise<void> {
   const defaultPrompt = prompt.textContent ?? 'Click to enter the city';
   prompt.textContent = 'Building Lost Heaven\u2026';
   const species = Object.keys(TREE_MODELS) as TreeSpecies[];
-  const [assets, carModel, trafficModels, treeModels, animalModels] = await Promise.all([
-    loadCityAssets(),
-    loadOptionalModel(VEHICLE.url),
-    Promise.all(TRAFFIC_CARS.map((c) => loadOptionalModel(c.url))),
-    Promise.all(species.map((s) => loadOptionalModel(TREE_MODELS[s].url))),
-    Promise.all(ANIMALS.map((a) => loadOptionalModel(a.url))),
-  ]);
+  const [assets, carModel, trafficModels, treeModels, animalModels, gangModels, pistolModel] =
+    await Promise.all([
+      loadCityAssets(),
+      loadOptionalModel(VEHICLE.url),
+      Promise.all(TRAFFIC_CARS.map((c) => loadOptionalModel(c.url))),
+      Promise.all(species.map((s) => loadOptionalModel(TREE_MODELS[s].url))),
+      Promise.all(ANIMALS.map((a) => loadOptionalModel(a.url))),
+      Promise.all(GANGSTER_MODELS.map((url) => loadOptionalModel(url))),
+      loadOptionalModel(PISTOL_MODEL.url),
+    ]);
   prompt.textContent = defaultPrompt;
 
   const renderer = new Renderer(ctx, layout, assets);
@@ -180,6 +198,29 @@ async function main(): Promise<void> {
         )
     : [];
 
+  // The rival gang, each member in a random one of the character models.
+  const gangRng = createRng((Math.random() * 2 ** 32) >>> 0);
+  const war = new GangWar(
+    layout,
+    { ...DEFAULT_GANG_WAR, safe: { x: spawn, z: spawn } },
+    collision,
+    gangRng,
+  );
+  const pistolKind = pistolModel && renderer.createModel(pistolModel);
+  const looks = gangModels.flatMap((loaded) => {
+    if (!loaded) return [];
+    const fit = fitBody(loaded.data);
+    const arm = loaded.data.parts.find((p) => p.name === 'arm-right')?.matrix ?? identity();
+    const grip = gripTransform(PISTOL_MODEL, fit.scale);
+    return [{ model: renderer.createModel(loaded), fit, arm, grip }];
+  });
+  const lookOf = new Map<Gangster, (typeof looks)[number]>();
+  if (looks.length) for (const g of war.gangsters) lookOf.set(g, gangRng.pick(looks));
+  const pistol = new Pistol();
+  const combatHud = new CombatHud();
+  /** Counts down from RESPAWN_DELAY once the player is killed. */
+  let downFor = 0;
+
   // Time runs while playing; N or the button skips ahead to evening or morning.
   const clock = new GameClock();
   const isDay = (): boolean => daylightAt(clock.hour).daylight > 0.5;
@@ -227,13 +268,18 @@ async function main(): Promise<void> {
   }
   let driven: FreeCar | null = null;
 
-  /** What traffic has to stop for besides itself: cars out of traffic, and the player on foot. */
+  /** What traffic has to stop for besides itself: cars out of traffic, and people on foot. */
   const playerObstacles = (): Obstacle[] => {
     const list = freeCars.map((c) => carObstacle(c.vehicle, c.vehicle));
-    if (!driven) {
-      const { x, z } = camera.position;
-      list.push({ x, z, heading: 0, halfLength: PEDESTRIAN_RADIUS, halfWidth: PEDESTRIAN_RADIUS });
-    }
+    const person = (x: number, z: number): Obstacle => ({
+      x,
+      z,
+      heading: 0,
+      halfLength: PEDESTRIAN_RADIUS,
+      halfWidth: PEDESTRIAN_RADIUS,
+    });
+    if (!driven) list.push(person(camera.position.x, camera.position.z));
+    for (const g of war.gangsters) if (g.alive) list.push(person(g.body.x, g.body.z));
     return list;
   };
 
@@ -285,13 +331,29 @@ async function main(): Promise<void> {
   let hudTimer = 0;
   let fps = 0;
 
+  const flashLight = (flash: Flash): SpotLight => {
+    const fade = 1 - flash.age / 0.07;
+    return {
+      position: flash.position,
+      direction: flash.direction,
+      color: [FLASH_COLOR[0] * fade, FLASH_COLOR[1] * fade, FLASH_COLOR[2] * fade],
+      range: FLASH_RANGE,
+      inner: 0.8,
+      outer: 1.4,
+    };
+  };
+
   let flashlightOn = false;
   /**
-   * The flashlight first, then headlights of traffic and the driven car, then
-   * the nearest lamps, the last two dimmed as the lights come up at dusk.
+   * The flashlight and muzzle flashes first, then headlights of traffic and the
+   * driven car, then the nearest lamps, the last two dimmed as the lights come
+   * up at dusk.
    */
   const sceneLights = (level: number): SpotLight[] => {
-    const own = flashlightOn ? [flashlight(camera)] : [];
+    const own = [
+      ...(flashlightOn ? [flashlight(camera)] : []),
+      ...nearestLights(war.flashes.map(flashLight), camera.position, 4),
+    ];
     if (level < 0.01) return own;
     const dim = (light: SpotLight): SpotLight => ({
       ...light,
@@ -369,12 +431,49 @@ async function main(): Promise<void> {
     if (driven) {
       driven.odometerKm += (Math.abs(driven.vehicle.speed) * dt) / 1000;
       drive.updateCamera(dt, driven.vehicle);
-    } else {
+    } else if (war.alive) {
       controller.update(dt);
     }
 
     traffic.update(dt, playerObstacles(), trafficRng);
     for (const { animal } of animals) animal.update(dt, animalRng, collision);
+    fight(dt);
+  };
+
+  /** The gang war this frame: the player's shots, the gang's, and getting back up. */
+  const fight = (dt: number): void => {
+    pistol.update(dt);
+    const standing = war.alive;
+    if (standing && !driven) {
+      if (input.wasPressed('KeyR')) pistol.reload();
+      if (input.wasPressed('Mouse0') && pistol.trigger()) {
+        const origin = { ...camera.position };
+        const direction = camera.forward();
+        const shot = war.shoot(origin, direction, (max) =>
+          collision.raycast(origin, direction, max),
+        );
+        if (shot.gangster) combatHud.hitMarker();
+        camera.addLook(0, RECOIL);
+      }
+    }
+    if (driven) war.runOver(carObstacle(driven.vehicle, driven), driven.vehicle.speed);
+
+    const eye = driven
+      ? { x: driven.vehicle.x, y: driven.vehicle.y + 1.2, z: driven.vehicle.z }
+      : { ...camera.position };
+    war.update(dt, { position: eye, alive: standing, inCar: driven !== null }, collision, gangRng);
+
+    for (const event of war.events.splice(0)) combatHud.announce(event.text, event.points);
+
+    if (!war.alive) {
+      downFor += dt;
+      if (downFor > RESPAWN_DELAY) {
+        downFor = 0;
+        driven = null;
+        controller.teleport(spawn, spawn, Math.PI);
+        war.respawn();
+      }
+    }
   };
 
   startLoop(({ dt }) => {
@@ -411,6 +510,23 @@ async function main(): Promise<void> {
         pose: vehiclePose(trafficCar.vehicle, kind.config),
       });
     }
+    for (const gangster of war.gangsters) {
+      const look = lookOf.get(gangster);
+      if (!look) continue;
+      const transform = gangster.body.transform(look.fit);
+      const pose = gangster.body.pose();
+      instances.push({ model: look.model, transform, pose });
+      if (pistolKind && gangster.alive) {
+        const gun: Mat4 = handTransform(transform, look.arm, pose('arm-right'), look.grip);
+        instances.push({ model: pistolKind, transform: gun });
+      }
+    }
+    if (pistolKind && !driven && war.alive) {
+      instances.push({
+        model: pistolKind,
+        transform: viewmodelTransform(camera, PISTOL_MODEL, pistol.kick),
+      });
+    }
     const sun = daylightAt(clock.hour);
     renderer.render(camera, instances, {
       daylight: sun.daylight,
@@ -435,6 +551,31 @@ async function main(): Promise<void> {
         ...traffic.cars.map((c) => mapCar(c.vehicle, kindOf.get(c)?.entry.mapColor ?? '#cccccc')),
         ...freeCars.map((c) => mapCar(c.vehicle, c === driven ? PLAYER_CAR_COLOR : c.mapColor)),
       ],
+      {
+        areas: war.districts
+          .filter((d) => d.contested)
+          .map((d) => ({
+            rect: d.bounds,
+            color: d.captured ? 'rgba(70, 170, 90, 0.22)' : 'rgba(200, 40, 30, 0.25)',
+          })),
+        dots: war.gangsters
+          .filter((g) => g.alive)
+          .map((g) => ({ x: g.body.x, z: g.body.z, color: '#ff3b30' })),
+      },
+    );
+
+    combatHud.update(
+      {
+        health: war.health,
+        magazine: pistol.magazine,
+        reloading: pistol.reloading,
+        score: war.score,
+        taken: war.contested - war.remaining,
+        total: war.contested,
+        showAmmo: !driven,
+        hurt: war.hurt,
+      },
+      dt,
     );
 
     speedometerCanvas.hidden = !driven;

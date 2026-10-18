@@ -123,6 +123,108 @@
         display: none;
       }
 
+      #crosshair.hit {
+        width: 10px;
+        height: 10px;
+        margin: -5px 0 0 -5px;
+        background: #e2453a;
+      }
+
+      .gauge {
+        position: fixed;
+        bottom: 34px;
+        display: flex;
+        align-items: baseline;
+        gap: 0.4rem;
+        padding: 0.3rem 0.8rem;
+        font:
+          bold 1.6rem Georgia,
+          'Times New Roman',
+          serif;
+        color: #f2e9d4;
+        background: rgba(20, 16, 12, 0.6);
+        border: 1px solid rgba(201, 153, 58, 0.7);
+        border-radius: 4px;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+        pointer-events: none;
+      }
+
+      .gauge[hidden] {
+        display: none;
+      }
+
+      .gauge .icon {
+        color: #d8483a;
+      }
+
+      .gauge .unit {
+        font-size: 0.9rem;
+        color: #c9b48a;
+      }
+
+      #health {
+        left: 12px;
+      }
+
+      #health.low .value {
+        color: #ff6a5e;
+      }
+
+      #ammo {
+        right: 16px;
+      }
+
+      #score {
+        position: fixed;
+        top: 14px;
+        left: 50%;
+        transform: translateX(-50%);
+        text-align: center;
+        font:
+          bold 1.4rem Georgia,
+          'Times New Roman',
+          serif;
+        color: #f2e9d4;
+        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+        pointer-events: none;
+      }
+
+      #score .districts {
+        display: block;
+        font-size: 0.8rem;
+        font-weight: normal;
+        color: #d8c39a;
+        letter-spacing: 0.08em;
+      }
+
+      #message {
+        position: fixed;
+        top: 28%;
+        left: 50%;
+        transform: translateX(-50%);
+        font:
+          bold 2rem Georgia,
+          'Times New Roman',
+          serif;
+        color: #f6e7c4;
+        text-shadow: 0 2px 6px rgba(0, 0, 0, 0.95);
+        letter-spacing: 0.06em;
+        pointer-events: none;
+        transition: opacity 0.4s;
+      }
+
+      #damage {
+        position: fixed;
+        inset: 0;
+        background: radial-gradient(
+          ellipse at center,
+          rgba(160, 0, 0, 0) 45%,
+          rgba(160, 0, 0, 0.75)
+        );
+        opacity: 0;
+        pointer-events: none;
+      }
+
       #minimap {
         position: fixed;
         top: 16px;
@@ -182,6 +284,15 @@
     <canvas id="gl"></canvas>
     <div id="crosshair" hidden></div>
     <div id="hud"></div>
+    <div id="damage"></div>
+    <div id="health" class="gauge">
+      <span class="icon">&#10010;</span><span class="value">100</span>
+    </div>
+    <div id="ammo" class="gauge">
+      <span class="value">8</span><span class="unit">/ &infin;</span>
+    </div>
+    <div id="score"><span class="value">0</span><span class="districts"></span></div>
+    <div id="message"></div>
     <canvas id="minimap"></canvas>
     <canvas id="clock"></canvas>
     <button id="daynight" type="button">Skip to evening (N)</button>
@@ -195,6 +306,10 @@
         <dd>walk</dd>
         <dt>Mouse</dt>
         <dd>look</dd>
+        <dt>Left click</dt>
+        <dd>shoot</dd>
+        <dt>R</dt>
+        <dd>reload</dd>
         <dt>Shift</dt>
         <dd>run</dd>
         <dt>Space</dt>

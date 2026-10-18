@@ -171,6 +171,20 @@ export const TRAFFIC_CARS: readonly TrafficCarModel[] = [
 /** Cars driving around town at once. */
 export const TRAFFIC_COUNT = 100;
 
+/** The rival gang: Kenney "Blocky Characters" (CC0), one picked at random per gangster. */
+export const GANGSTER_MODELS: readonly string[] = 'abcdefghijklmnopqr'
+  .split('')
+  .map((letter) => `/models-people/character-${letter}.glb`);
+
+/** Everyone's pistol: Kenney "Blaster Kit" (CC0). */
+export const PISTOL_MODEL = {
+  url: '/models-weapons/blaster-b.glb',
+  /** Model units to metres. */
+  scale: 0.5,
+  /** +1 if the barrel points down the model's +Z, -1 for -Z. */
+  forward: -1,
+};
+
 /**
  * Tree species: a model and the height it should stand, in metres. Width
  * follows from the model's proportions.

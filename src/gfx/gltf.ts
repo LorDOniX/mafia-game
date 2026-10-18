@@ -114,7 +114,12 @@ interface GltfJson {
   materials?: Array<{
     pbrMetallicRoughness?: {
       baseColorFactor?: number[];
-      baseColorTexture?: { index: number };
+      baseColorTexture?: {
+        index: number;
+        extensions?: {
+          KHR_texture_transform?: { offset?: number[]; scale?: number[]; rotation?: number };
+        };
+      };
     };
     emissiveFactor?: number[];
     doubleSided?: boolean;
@@ -159,6 +164,13 @@ const INDEX_SIZES: Record<number, number> = { 5121: 1, 5123: 2, 5125: 4 };
 const COMPONENTS: Record<string, number> = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4 };
 const TRIANGLES = 4;
 
+/**
+ * Required extensions it is safe to read past. Unlit materials are shaded like
+ * any other, so characters sit in the city's light; texture transforms are
+ * accepted only as the identity, which is all Kenney's kits use.
+ */
+const TOLERATED_EXTENSIONS = new Set(['KHR_materials_unlit', 'KHR_texture_transform']);
+
 export function parseGlb(buffer: ArrayBuffer): ModelData {
   const view = new DataView(buffer);
   if (buffer.byteLength < 12 || view.getUint32(0, true) !== GLB_MAGIC) {
@@ -192,9 +204,10 @@ export function parseGlb(buffer: ArrayBuffer): ModelData {
 }
 
 function readModel(gltf: GltfJson, bin: DataView | null): ModelData {
-  if (gltf.extensionsRequired?.length) {
+  const unsupported = (gltf.extensionsRequired ?? []).filter((e) => !TOLERATED_EXTENSIONS.has(e));
+  if (unsupported.length) {
     // Typically Draco or meshopt compression; re-export without it.
-    throw new Error(`Unsupported required extensions: ${gltf.extensionsRequired.join(', ')}`);
+    throw new Error(`Unsupported required extensions: ${unsupported.join(', ')}`);
   }
   if (gltf.buffers?.some((buffer) => buffer.uri !== undefined)) {
     throw new Error('External .bin buffers are not supported; export as a single .glb');
@@ -339,6 +352,12 @@ function readMaterial(gltf: GltfJson, bin: DataView | null, index: number, model
   if (!material) return;
 
   model.doubleSided = material.doubleSided ?? false;
+
+  const transform =
+    material.pbrMetallicRoughness?.baseColorTexture?.extensions?.KHR_texture_transform;
+  if (transform && (transform.offset || transform.scale || transform.rotation)) {
+    throw new Error('Texture transforms other than the identity are not supported');
+  }
 
   const textureIndex = material.pbrMetallicRoughness?.baseColorTexture?.index;
   if (textureIndex === undefined) return;

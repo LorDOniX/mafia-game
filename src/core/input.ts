@@ -20,6 +20,7 @@ const GAME_KEYS = new Set([
   'KeyE',
   'KeyF',
   'KeyN',
+  'KeyR',
   'KeyT',
   'Space',
   'ShiftLeft',
@@ -60,6 +61,15 @@ export class Input {
       this.lookDelta.y += e.movementY;
     };
 
+    // Buttons count only in play, so the click that grabs the mouse never fires.
+    const onMouseDown = (e: MouseEvent): void => {
+      if (!this.pointerLocked) return;
+      const code = `Mouse${e.button}`;
+      if (!this.held.has(code)) this.pressedThisFrame.add(code);
+      this.held.add(code);
+    };
+    const onMouseUp = (e: MouseEvent): void => void this.held.delete(`Mouse${e.button}`);
+
     const onLockChange = (): void => {
       this.pointerLocked = document.pointerLockElement === canvas;
       if (!this.pointerLocked) {
@@ -78,6 +88,8 @@ export class Input {
     window.addEventListener('keyup', onKeyUp);
     window.addEventListener('blur', onLockChange);
     document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mousedown', onMouseDown);
+    document.addEventListener('mouseup', onMouseUp);
     document.addEventListener('pointerlockchange', onLockChange);
     document.addEventListener('click', onClick);
 
@@ -86,6 +98,8 @@ export class Input {
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', onLockChange);
       document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mousedown', onMouseDown);
+      document.removeEventListener('mouseup', onMouseUp);
       document.removeEventListener('pointerlockchange', onLockChange);
       document.removeEventListener('click', onClick);
     });
