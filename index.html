@@ -126,7 +126,7 @@
       #minimap {
         position: fixed;
         top: 16px;
-        right: 16px;
+        left: 16px;
         width: 200px;
         height: 200px;
         border-radius: 50%;
@@ -135,25 +135,23 @@
         pointer-events: none;
       }
 
-      #speedo {
+      #speedometer {
         position: fixed;
-        right: 24px;
-        bottom: 20px;
-        font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
-        color: #e8e4da;
-        text-align: right;
-        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.9);
+        right: 12px;
+        bottom: 10px;
+        width: 320px;
+        height: 230px;
         pointer-events: none;
       }
 
-      #speedo[hidden] {
+      #speedometer[hidden] {
         display: none;
       }
 
       #daynight {
         position: fixed;
         top: 16px;
-        left: 16px;
+        right: 16px;
         z-index: 1;
         padding: 0.45rem 0.9rem;
         font: inherit;
@@ -169,17 +167,6 @@
       #daynight:hover {
         background: rgba(40, 36, 30, 0.8);
       }
-
-      #speedo .value {
-        font-size: 3.5rem;
-        line-height: 1;
-      }
-
-      #speedo .unit {
-        font-size: 0.9rem;
-        color: #d8c9a3;
-        letter-spacing: 0.15em;
-      }
     </style>
   </head>
   <body>
@@ -188,7 +175,7 @@
     <div id="hud"></div>
     <canvas id="minimap"></canvas>
     <button id="daynight" type="button">Switch to night (N)</button>
-    <div id="speedo" hidden><span class="value">0</span> <span class="unit">km/h</span></div>
+    <canvas id="speedometer" hidden></canvas>
 
     <div id="overlay">
       <h1>Lost Heaven</h1>

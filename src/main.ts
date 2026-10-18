@@ -32,6 +32,7 @@ import { buildRoadNetwork, Traffic, type TrafficCar } from '@/vehicle/traffic';
 import type { Obstacle } from '@/city/collision';
 import { Animal, fitAnimal } from '@/animals/animal';
 import { Minimap, type MapCar } from '@/ui/minimap';
+import { Speedometer } from '@/ui/speedometer';
 import { bakeInstances } from '@/gfx/batch';
 import { MAX_LIGHTS, nearestLights, type SpotLight } from '@/gfx/lights';
 import { flashlight } from '@/core/flashlight';
@@ -52,8 +53,7 @@ async function main(): Promise<void> {
   const crosshair = document.querySelector<HTMLElement>('#crosshair');
   const hud = document.querySelector<HTMLElement>('#hud');
   const minimapCanvas = document.querySelector<HTMLCanvasElement>('#minimap');
-  const speedo = document.querySelector<HTMLElement>('#speedo');
-  const speedoValue = speedo?.querySelector<HTMLElement>('.value');
+  const speedometerCanvas = document.querySelector<HTMLCanvasElement>('#speedometer');
   const dayNight = document.querySelector<HTMLButtonElement>('#daynight');
 
   if (
@@ -63,8 +63,7 @@ async function main(): Promise<void> {
     !crosshair ||
     !hud ||
     !minimapCanvas ||
-    !speedo ||
-    !speedoValue ||
+    !speedometerCanvas ||
     !dayNight
   ) {
     throw new Error('Missing required DOM nodes');
@@ -222,6 +221,8 @@ async function main(): Promise<void> {
 
   const drive = new DriveController(camera, input, collision);
   const minimap = new Minimap(minimapCanvas, layout);
+  const speedometer = new Speedometer(speedometerCanvas);
+  let odometerKm = 0;
   const mapCar = (v: Vehicle, color: string): MapCar => ({
     x: v.x,
     z: v.z,
@@ -284,6 +285,7 @@ async function main(): Promise<void> {
 
     // The car keeps simulating when empty, so one left rolling coasts to a stop.
     vehicle?.update(dt, driving ? drive.controls() : PARKED, playerWorld);
+    if (vehicle) odometerKm += (Math.abs(vehicle.speed) * dt) / 1000;
     if (vehicle && driving) drive.updateCamera(dt, vehicle);
     else controller.update(dt);
 
@@ -343,8 +345,10 @@ async function main(): Promise<void> {
       ],
     );
 
-    speedo.hidden = !(driving && vehicle);
-    if (driving && vehicle) speedoValue.textContent = Math.abs(vehicle.speed * 3.6).toFixed(0);
+    speedometerCanvas.hidden = !(driving && vehicle);
+    if (driving && vehicle) {
+      speedometer.draw({ speedKmh: vehicle.speed * 3.6, odometerKm });
+    }
 
     const locked = input.pointerLocked;
     overlay.hidden = locked;
