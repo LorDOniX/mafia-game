@@ -16,7 +16,9 @@ const network = buildRoadNetwork(layout);
 
 function bodyOf(url: string): VehicleBody {
   const glb = readFileSync(fileURLToPath(new URL(`../public${url}`, import.meta.url)));
-  const model = parseGlb(glb.buffer.slice(glb.byteOffset, glb.byteOffset + glb.byteLength) as ArrayBuffer);
+  const model = parseGlb(
+    glb.buffer.slice(glb.byteOffset, glb.byteOffset + glb.byteLength) as ArrayBuffer,
+  );
   const entry = TRAFFIC_CARS.find((c) => c.url === url);
   if (!entry) throw new Error(`${url} is not a traffic car`);
   return fitVehicle(model, trafficVehicleConfig(entry)).body;
@@ -80,7 +82,9 @@ function along(path: Path): Obstacle[] {
       out.push({
         x: a.x + (b.x - a.x) * t,
         z: a.z + (b.z - a.z) * t,
-        heading: a.heading + Math.atan2(Math.sin(b.heading - a.heading), Math.cos(b.heading - a.heading)) * t,
+        heading:
+          a.heading +
+          Math.atan2(Math.sin(b.heading - a.heading), Math.cos(b.heading - a.heading)) * t,
         halfLength: firetruck.length / 2,
         halfWidth: firetruck.width / 2,
       });
@@ -193,6 +197,23 @@ describe('Traffic', () => {
 
     expect(car.vehicle.speed).toBeCloseTo(0);
     expect(overlap(footprint(car.vehicle), person)).toBe(false);
+  });
+
+  it('lets a car be taken out of traffic, freeing any crossroads it claimed', () => {
+    const traffic = town(20, 7);
+    const rng = createRng(8);
+    // Run until some car has claimed a crossroads.
+    let claimer = traffic.cars.find((c) => c.cleared);
+    for (let t = 0; t < 30 && !claimer; t += 1 / 20) {
+      traffic.update(1 / 20, [], rng);
+      claimer = traffic.cars.find((c) => c.cleared);
+    }
+    if (!claimer) throw new Error('no car reached a crossroads');
+
+    traffic.remove(claimer);
+    expect(traffic.cars).not.toContain(claimer);
+    expect(traffic.network.junctions.some((j) => j.occupants.has(claimer))).toBe(false);
+    expect(traffic.obstacles().some((o) => o.owner === claimer)).toBe(false);
   });
 
   it('makes cars solid for the player', () => {

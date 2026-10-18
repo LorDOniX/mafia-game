@@ -119,8 +119,16 @@ export function buildRoadNetwork(layout: CityLayout): RoadNetwork {
         const r = rightOf(d);
         const offset = { x: r.x * lane, z: r.z * lane };
         const path = makePath([
-          { x: from.x + d.x * half + offset.x, z: from.z + d.z * half + offset.z, heading: headingOf(d) },
-          { x: to.x - d.x * half + offset.x, z: to.z - d.z * half + offset.z, heading: headingOf(d) },
+          {
+            x: from.x + d.x * half + offset.x,
+            z: from.z + d.z * half + offset.z,
+            heading: headingOf(d),
+          },
+          {
+            x: to.x - d.x * half + offset.x,
+            z: to.z - d.z * half + offset.z,
+            heading: headingOf(d),
+          },
         ]);
         const created: Lane = { from, to, direction, path };
         from.exits[direction] = created;
@@ -359,7 +367,9 @@ export class TrafficCar {
 
   /** Where the car's centre will be `ahead` metres on, through the crossroads and out. */
   private pointAhead(ahead: number): Point {
-    const route = this.crossing ? [this.way, this.exit.path] : [this.lane.path, this.way, this.exit.path];
+    const route = this.crossing
+      ? [this.way, this.exit.path]
+      : [this.lane.path, this.way, this.exit.path];
     let d = this.distance + ahead;
     for (const path of route) {
       if (d <= path.length) return pointOn(path, d);
@@ -376,7 +386,10 @@ export class TrafficCar {
     );
     if (options.length === 0) return;
 
-    let pick = rng.range(0, options.reduce((sum, t) => sum + TURN_WEIGHT[t], 0));
+    let pick = rng.range(
+      0,
+      options.reduce((sum, t) => sum + TURN_WEIGHT[t], 0),
+    );
     for (const turn of options) {
       pick -= TURN_WEIGHT[turn];
       if (pick <= 0) {
@@ -445,6 +458,13 @@ export class Traffic {
       return car;
     }
     return null;
+  }
+
+  /** Takes a car out of traffic for good, giving up any crossroads it had claimed. */
+  remove(car: TrafficCar): void {
+    const index = this.cars.indexOf(car);
+    if (index >= 0) this.cars.splice(index, 1);
+    for (const junction of this.network.junctions) junction.occupants.delete(car);
   }
 
   /** Footprints of every car, for the collision world and for each other. */
