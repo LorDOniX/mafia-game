@@ -4,7 +4,7 @@ import { startLoop } from '@/core/loop';
 import { Input } from '@/core/input';
 import { Camera } from '@/core/camera';
 import { FirstPersonController } from '@/core/controller';
-import { generateCity } from '@/city/layout';
+import { DEFAULT_CITY_CONFIG, generateCity } from '@/city/layout';
 import { CityCollision } from '@/city/collision';
 import {
   ANIMALS,
@@ -53,7 +53,7 @@ import { identity, type Mat4 } from '@/math/mat4';
 import { fitBody, handTransform } from '@/people/body';
 import type { Gangster } from '@/people/gangster';
 import { gripTransform, viewmodelTransform } from '@/people/weapon';
-import { DEFAULT_GANG_WAR, GangWar, type Flash } from '@/game/gangwar';
+import { DEFAULT_GANG_WAR, GangWar, planTurf, type Flash } from '@/game/gangwar';
 import { Pistol } from '@/game/pistol';
 import { CombatHud } from '@/ui/combat-hud';
 
@@ -113,7 +113,16 @@ async function main(): Promise<void> {
   }
 
   const ctx = createContext(canvas);
-  const layout = generateCity();
+  // Spawn uprostřed křižovatky s pohledem podél třídy: blok N začíná
+  // na N * pitch + streetWidth / 2, takže celé násobky pitch padnou
+  // na osy ulic.
+  const pitch = DEFAULT_CITY_CONFIG.blockSize + DEFAULT_CITY_CONFIG.streetWidth;
+  const spawn = Math.floor(DEFAULT_CITY_CONFIG.gridSize / 2) * pitch;
+  // Území gangu se vybírá před stavbou města, protože každá jeho čtvrť má svůj park.
+  const gangRng = createRng((Math.random() * 2 ** 32) >>> 0);
+  const gangOptions = { ...DEFAULT_GANG_WAR, safe: { x: spawn, z: spawn } };
+  const turf = planTurf(DEFAULT_CITY_CONFIG, gangOptions, gangRng);
+  const layout = generateCity({ parks: turf.parks });
   applyCustomFacades(layout, CUSTOM_FACADES);
   const collision = new CityCollision(layout);
 
@@ -123,10 +132,6 @@ async function main(): Promise<void> {
   const input = new Input(canvas);
   const controller = new FirstPersonController(camera, input, collision);
 
-  // Spawn uprostřed křižovatky s pohledem podél třídy: blok N začíná
-  // na N * pitch + streetWidth / 2, takže celé násobky pitch padnou
-  // na osy ulic.
-  const spawn = Math.floor(layout.config.gridSize / 2) * layout.pitch;
   controller.teleport(spawn, spawn, Math.PI);
 
   // Textury a obloha se sestaví nebo stáhnou před prvním snímkem, takže samotný
@@ -204,13 +209,7 @@ async function main(): Promise<void> {
     : [];
 
   // Soupeřící gang, každý člen v náhodně vybraném modelu postavy.
-  const gangRng = createRng((Math.random() * 2 ** 32) >>> 0);
-  const war = new GangWar(
-    layout,
-    { ...DEFAULT_GANG_WAR, safe: { x: spawn, z: spawn } },
-    collision,
-    gangRng,
-  );
+  const war = new GangWar(layout, gangOptions, turf, collision, gangRng);
   const pistolKind = pistolModel && renderer.createModel(pistolModel);
   const looks = gangModels.flatMap((loaded) => {
     if (!loaded) return [];

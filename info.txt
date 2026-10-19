@@ -1,2 +1,0 @@
-claude --resume 97310c04-97d5-4db1-8e39-073543e59dd1
-https://ambientcg.com/view?id=Road008B

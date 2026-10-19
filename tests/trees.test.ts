@@ -9,7 +9,12 @@ import { bakeInstances } from '@/gfx/batch';
 import { FLOATS_PER_MODEL_VERTEX, parseGlb } from '@/gfx/gltf';
 import { transformPoint } from '@/math/mat4';
 
-const city = generateCity();
+const city = generateCity({
+  parks: [
+    { i: 1, j: 1 },
+    { i: 6, j: 2 },
+  ],
+});
 
 describe('tree planting', () => {
   it('lines the streets and plants the parks', () => {
@@ -34,7 +39,7 @@ describe('tree planting', () => {
   });
 
   it('leaves the buildings exactly where they were before parks existed', () => {
-    const withoutParks = generateCity({ parkChance: 0 });
+    const withoutParks = generateCity();
     const parks = city.blocks.filter((b) => b.isPark);
     const kept = withoutParks.buildings.filter(
       (b) => !parks.some((park) => rectContains(park.plot, b.footprint.minX, b.footprint.minZ)),

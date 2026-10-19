@@ -71,7 +71,6 @@ src/
   ui/                minimapa, tachometr, hodiny, bojový HUD
 tests/               testy ve Vitestu, jeden soubor na oblast
 public/              modely a textury servírované tak, jak jsou
-assets-src/          zdrojové soubory assetů (fotky, licence), do hry se nenačítají
 ```
 
 Každý modul má jednu zodpovědnost a většina logiky je psaná jako čisté funkce
@@ -137,9 +136,11 @@ Celé město je deterministické – vychází z jednoho seedu (1930) a generát
 - **Budovy** se staví po obvodu každého bloku jako řadové domy. Výška roste směrem
   k centru (proměnná `density`), takže uprostřed je „downtown“.
 - **Náměstí** – zhruba 9 % bloků zůstane prázdných a dlážděných.
-- **Parky** – další bloky na okraji města se změní na park s trávou. Parky, stromy
-  i lampy mají **vlastní generátor náhody**. Když se přidaly, žádná budova se tím
-  neposunula a vlastní fasády (cílené na konkrétní souřadnice) zůstaly na místě.
+- **Parky** – nejsou náhodné: každá čtvrť, kterou drží gang, má právě jeden park
+  s trávou (`planTurf` v `game/gangwar.ts` ho vybere ještě před stavbou města
+  a předá v `CityConfig.parks`). Jinde parky nejsou. Budovy se generují i pod
+  parkem, takže park žádnou jinou budovu neposune a vlastní fasády (cílené na
+  konkrétní souřadnice) zůstanou na místě; stromy mají vlastní generátor náhody.
 - **Stromy** (`plantTrees`): podél každého chodníku (1,2 m od obrubníku, s volnými
   rohy kvůli přechodům), v kruhu kolem náměstí a v mřížce s náhodným posunem v parcích.
 - **Lampy** (`placeLamps`): na každém rohu chodníku natočené do křižovatky a uprostřed

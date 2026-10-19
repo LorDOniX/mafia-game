@@ -50,26 +50,38 @@ const FIRE_INTERVAL = { min: 0.9, max: 1.7 };
 const DAMAGE = { min: 8, max: 14 };
 /** Reakční doba před prvním výstřelem, sekundy. */
 const DRAW_TIME = 0.8;
+/** Jak dlouho postává na místě, než se zase vydá jít, sekundy. */
+const IDLE_TIME = { min: 2, max: 7 };
+/** Jak moc se při postávání odvrací od kolmého pohledu do ulice, radiány. */
+const IDLE_GLANCE = 0.6;
+/** Jak blízko musí dojít k bodu trasy, metry. */
+const WAYPOINT_REACH = 0.5;
 
 type State = 'patrol' | 'combat' | 'dead';
 
 /**
- * Člen konkurenčního gangu: prochází se po chodníku kolem svého bloku, dokud
- * nezahlédne hráče, pak se otočí, zvedne pistoli, přiblíží se a střílí, dokud
- * jeden z nich nepadne nebo dokud hráče dostatečně dlouho neztratí z očí.
+ * Člen konkurenčního gangu: prochází se po chodníku kolem svého bloku a postává
+ * s pohledem do ulice, dokud nezahlédne hráče, pak se otočí, zvedne pistoli,
+ * přiblíží se a střílí, dokud jeden z nich nepadne nebo dokud hráče dostatečně
+ * dlouho neztratí z očí.
  */
 export class Gangster {
   readonly body = new Body();
   health = GANGSTER_HEALTH;
   state: State = 'patrol';
 
-  private target = { x: 0, z: 0 };
+  /** Zbylé body cesty po chodníku; poslední je cíl, kde bude postávat. */
+  private route: Array<{ x: number; z: number }> = [];
+  private idle = 0;
+  private idleHeading = 0;
   private cooldown = DRAW_TIME;
   private lookTimer = 0;
   private sinceSeen = Infinity;
   private seesTarget = false;
   private lastSeen = { x: 0, z: 0 };
   private stuck = 0;
+  /** Střední čára chodníku kolem bloku, po které vede každá trasa. */
+  private readonly ring: Rect;
 
   constructor(
     /** Chodník jeho bloku; hlíduje v prstenci mezi ním a pozemkem. */
@@ -78,12 +90,19 @@ export class Gangster {
     rng: Rng,
     world: GangsterWorld,
   ) {
+    this.ring = {
+      minX: (sidewalk.minX + plot.minX) / 2,
+      minZ: (sidewalk.minZ + plot.minZ) / 2,
+      maxX: (sidewalk.maxX + plot.maxX) / 2,
+      maxZ: (sidewalk.maxZ + plot.maxZ) / 2,
+    };
     const spot = this.randomSidewalkPoint(rng);
     this.body.x = spot.x;
     this.body.z = spot.z;
     this.body.y = world.groundHeightAt(spot.x, spot.z);
-    this.body.heading = rng.range(0, Math.PI * 2);
-    this.target = this.randomSidewalkPoint(rng);
+    // Nevyrazí všichni najednou.
+    this.standAround(rng, rng.range(0, IDLE_TIME.max));
+    this.body.heading = this.idleHeading;
   }
 
   get alive(): boolean {
@@ -135,7 +154,7 @@ export class Gangster {
     if (!this.seesTarget) this.sinceSeen += dt;
     if (this.state === 'combat' && (!player.alive || this.sinceSeen > FORGET_AFTER)) {
       this.standDown();
-      this.target = this.randomSidewalkPoint(rng);
+      this.planRoute(rng);
     }
 
     let shot: EnemyShot | null = null;
@@ -157,16 +176,111 @@ export class Gangster {
       }
     } else {
       body.aim = Math.max(0, body.aim - dt * 2);
-      const dx = this.target.x - body.x;
-      const dz = this.target.z - body.z;
-      if (Math.hypot(dx, dz) < 0.5 || this.stuck > 1) {
-        this.target = this.randomSidewalkPoint(rng);
-        this.stuck = 0;
-      }
-      const error = this.turnToward(Math.atan2(dx, dz), dt);
-      this.walk(Math.abs(error) < 0.6 ? WALK_SPEED : 0, dt, world);
+      this.patrol(dt, world, rng);
     }
     return shot;
+  }
+
+  private patrol(dt: number, world: GangsterWorld, rng: Rng): void {
+    if (this.idle > 0) {
+      this.idle -= dt;
+      this.turnToward(this.idleHeading, dt);
+      this.walk(0, dt, world);
+      if (this.idle <= 0) this.planRoute(rng);
+      return;
+    }
+
+    const next = this.route[0];
+    if (!next || this.stuck > 1) {
+      // Zaseknutý o strom nebo lampu to zkusí jinam.
+      if (next) this.planRoute(rng);
+      else this.standAround(rng);
+      this.stuck = 0;
+      return;
+    }
+    const dx = next.x - this.body.x;
+    const dz = next.z - this.body.z;
+    if (Math.hypot(dx, dz) < WAYPOINT_REACH) {
+      this.route.shift();
+      if (this.route.length === 0) this.standAround(rng);
+      return;
+    }
+    const error = this.turnToward(Math.atan2(dx, dz), dt);
+    this.walk(Math.abs(error) < 0.6 ? WALK_SPEED : 0, dt, world);
+  }
+
+  /** Zastaví se a dívá se do ulice před nejbližší stranou bloku. */
+  private standAround(rng: Rng, time = rng.range(IDLE_TIME.min, IDLE_TIME.max)): void {
+    const { normal } = this.onRing(this.body.x, this.body.z);
+    this.idle = time;
+    this.idleHeading = Math.atan2(normal.x, normal.z) + rng.range(-IDLE_GLANCE, IDLE_GLANCE);
+    this.route = [];
+  }
+
+  /**
+   * Trasa k náhodnému místu na chodníku kratší cestou kolem bloku, přes rohy,
+   * aby nikdy nevedla napříč budovou a nekončila čelem ke zdi.
+   */
+  private planRoute(rng: Rng): void {
+    const { minX, minZ, maxX, maxZ } = this.ring;
+    const w = maxX - minX;
+    const h = maxZ - minZ;
+    const length = 2 * (w + h);
+    const from = this.onRing(this.body.x, this.body.z);
+    const to = rng.range(0, length);
+    const forward = (((to - from.t) % length) + length) % length;
+    const span = forward <= length / 2 ? forward : forward - length;
+
+    // Vzdálenost každého rohu od začátku ve směru chůze.
+    const corners = [0, w, w + h, 2 * w + h]
+      .map((t) => ({
+        t,
+        along: span >= 0 ? (t - from.t + length) % length : (from.t - t + length) % length,
+      }))
+      .filter(({ along }) => along > 0 && along < Math.abs(span))
+      .sort((a, b) => a.along - b.along);
+
+    const start = this.ringPoint(from.t);
+    const end = this.ringPoint(to);
+    const across = this.onRing(end.x, end.z).normal;
+    // Bok chodníku, aby nestáli všichni přesně na jeho středu.
+    const band = Math.max(0, (this.plot.minX - this.sidewalk.minX) / 2 - 0.6);
+    const offset = rng.range(-band, band);
+
+    this.route = [
+      ...(Math.hypot(start.x - this.body.x, start.z - this.body.z) > 1.5 ? [start] : []),
+      ...corners.map(({ t }) => this.ringPoint(t)),
+      { x: end.x + across.x * offset, z: end.z + across.z * offset },
+    ];
+    this.idle = 0;
+  }
+
+  /** Bod na střední čáře chodníku ve vzdálenosti `t` od rohu (minX, minZ), po směru +X. */
+  private ringPoint(t: number): { x: number; z: number } {
+    const { minX, minZ, maxX, maxZ } = this.ring;
+    const w = maxX - minX;
+    const h = maxZ - minZ;
+    const s = ((t % (2 * (w + h))) + 2 * (w + h)) % (2 * (w + h));
+    if (s < w) return { x: minX + s, z: minZ };
+    if (s < w + h) return { x: maxX, z: minZ + (s - w) };
+    if (s < 2 * w + h) return { x: maxX - (s - w - h), z: maxZ };
+    return { x: minX, z: maxZ - (s - 2 * w - h) };
+  }
+
+  /** Nejbližší místo na střední čáře chodníku a normála té strany ven do ulice. */
+  private onRing(x: number, z: number): { t: number; normal: { x: number; z: number } } {
+    const { minX, minZ, maxX, maxZ } = this.ring;
+    const w = maxX - minX;
+    const h = maxZ - minZ;
+    const cx = clamp(x, minX, maxX);
+    const cz = clamp(z, minZ, maxZ);
+    const sides = [
+      { gap: Math.hypot(x - cx, z - minZ), t: cx - minX, normal: { x: 0, z: -1 } },
+      { gap: Math.hypot(x - maxX, z - cz), t: w + (cz - minZ), normal: { x: 1, z: 0 } },
+      { gap: Math.hypot(x - cx, z - maxZ), t: w + h + (maxX - cx), normal: { x: 0, z: 1 } },
+      { gap: Math.hypot(x - minX, z - cz), t: 2 * w + h + (maxZ - cz), normal: { x: -1, z: 0 } },
+    ];
+    return sides.reduce((best, side) => (side.gap < best.gap ? side : best));
   }
 
   private canSee(eye: Vec3, world: GangsterWorld): boolean {

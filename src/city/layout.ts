@@ -83,6 +83,12 @@ export interface LampSpot {
   rotation: number;
 }
 
+/** Blok v mřížce města: `i` podél X, `j` podél Z, oba od 0. */
+export interface GridCell {
+  i: number;
+  j: number;
+}
+
 export interface CityConfig {
   seed: number;
   /** Počet bloků na stranu; město je vždy čtvercové. */
@@ -97,8 +103,8 @@ export interface CityConfig {
   minBuildingWidth: number;
   maxBuildingWidth: number;
   plazaChance: number;
-  /** Šance, že se zastavěný blok na okraji města stane parkem; v centru nulová. */
-  parkChance: number;
+  /** Bloky, ze kterých se stanou parky, podle indexu v mřížce; jinde parky nejsou. */
+  parks: ReadonlyArray<GridCell>;
   /** Rozestup uličních stromů podél chodníku, v metrech. */
   streetTreeSpacing: number;
   /** Rozestup pouličních lamp podél chodníku, kromě lampy na každém rohu. */
@@ -117,7 +123,7 @@ export const DEFAULT_CITY_CONFIG: CityConfig = {
   minBuildingWidth: 9,
   maxBuildingWidth: 19,
   plazaChance: 0.09,
-  parkChance: 0.3,
+  parks: [],
   streetTreeSpacing: 14 * 3,
   lampSpacing: 60,
 };
@@ -154,8 +160,7 @@ const PLASTER_TINTS: Array<[number, number, number]> = [
 export function generateCity(overrides: Partial<CityConfig> = {}): CityLayout {
   const config: CityConfig = { ...DEFAULT_CITY_CONFIG, ...overrides };
   const rng = createRng(config.seed);
-  // Parky a stromy čerpají z vlastního proudu, takže jejich přidání nechá
-  // každou budovu tam, kde byla.
+  // Stromy čerpají z vlastního proudu, takže parky nechá každou budovu tam, kde byla.
   const greenRng = createRng(config.seed ^ 0x5eed7ee5);
   const pitch = config.blockSize + config.streetWidth;
   const half = config.streetWidth / 2;
@@ -182,15 +187,14 @@ export function generateCity(overrides: Partial<CityConfig> = {}): CityLayout {
       const density = 1 - Math.hypot(i - centre, j - centre) / maxDistance;
 
       const block: Block = { plot, sidewalk, buildings: [], isPlaza, isPark: false };
-      if (!isPlaza) {
-        fillPerimeter(block, config, rng, density);
-        if (greenRng.chance(config.parkChance * (1 - density))) {
-          block.buildings = [];
-          block.isPlaza = true;
-          block.isPark = true;
-        }
-        buildings.push(...block.buildings);
+      if (!isPlaza) fillPerimeter(block, config, rng, density);
+      // Budovy se vygenerují i tak, aby parky neposúvaly zbytek města.
+      if (config.parks.some((park) => park.i === i && park.j === j)) {
+        block.buildings = [];
+        block.isPlaza = true;
+        block.isPark = true;
       }
+      buildings.push(...block.buildings);
       blocks.push(block);
     }
   }

@@ -1,4 +1,4 @@
-import type { CityLayout, Rect } from '@/city/layout';
+import type { CityConfig, CityLayout, GridCell, Rect } from '@/city/layout';
 import type { Obstacle } from '@/city/collision';
 import { circleHitsObstacle } from '@/city/collision';
 import type { Rng } from '@/core/rng';
@@ -47,6 +47,46 @@ export interface GangWarEvent {
   points: number;
 }
 
+/** Území gangu, vybrané ještě před stavbou města, aby v něm mohly být parky. */
+export interface GangTurf {
+  /** Indexy čtvrtí ve stejném pořadí, jak je vrací `makeDistricts`. */
+  districts: number[];
+  /** Jeden park v každé z nich; patří do `CityConfig.parks`. */
+  parks: GridCell[];
+}
+
+/**
+ * Vybere čtvrti, které gang drží, mimo start hráče, a v každé jeden blok,
+ * který se stane parkem. Potřebuje jen rozměry města, ne město samotné.
+ */
+export function planTurf(config: CityConfig, options: GangWarOptions, rng: Rng): GangTurf {
+  const pitch = config.blockSize + config.streetWidth;
+  const margin = pitch / 2;
+  const { x, z } = options.safe;
+  const cells = districtCells(config.gridSize, options.districtSize);
+  const candidates = cells
+    .map((cell, index) => ({ cell, index }))
+    .filter(
+      ({ cell }) =>
+        !(
+          x >= cell.i0 * pitch - margin &&
+          x <= cell.i1 * pitch + margin &&
+          z >= cell.j0 * pitch - margin &&
+          z <= cell.j1 * pitch + margin
+        ),
+    );
+
+  const turf: GangTurf = { districts: [], parks: [] };
+  for (let n = 0; n < options.held && candidates.length; n++) {
+    const picked = candidates.splice(rng.int(0, candidates.length - 1), 1)[0];
+    if (!picked) break;
+    const { cell, index } = picked;
+    turf.districts.push(index);
+    turf.parks.push({ i: rng.int(cell.i0, cell.i1 - 1), j: rng.int(cell.j0, cell.j1 - 1) });
+  }
+  return turf;
+}
+
 export interface ShotResult {
   distance: number;
   /** Kdo byl zasažen, pokud vůbec někdo. */
@@ -77,21 +117,18 @@ export class GangWar {
   hurt = 0;
   private sinceHurt = Infinity;
 
-  constructor(layout: CityLayout, options: GangWarOptions, world: GangsterWorld, rng: Rng) {
+  constructor(
+    layout: CityLayout,
+    options: GangWarOptions,
+    turf: GangTurf,
+    world: GangsterWorld,
+    rng: Rng,
+  ) {
     this.districts = makeDistricts(layout, options.districtSize);
-    const candidates = this.districts.filter(
-      (d) =>
-        !(
-          options.safe.x >= d.bounds.minX - layout.pitch / 2 &&
-          options.safe.x <= d.bounds.maxX + layout.pitch / 2 &&
-          options.safe.z >= d.bounds.minZ - layout.pitch / 2 &&
-          options.safe.z <= d.bounds.maxZ + layout.pitch / 2
-        ),
-    );
 
-    for (let n = 0; n < options.held && candidates.length; n++) {
-      const district = candidates.splice(rng.int(0, candidates.length - 1), 1)[0];
-      if (!district) break;
+    for (const index of turf.districts) {
+      const district = this.districts[index];
+      if (!district) continue;
       district.contested = true;
       const blocks = layout.blocks.filter(
         (b) =>
@@ -207,23 +244,30 @@ export class GangWar {
 
 /** Rozdělí město na čtverce `size` krát `size` bloků, včetně ulic mezi nimi. */
 export function makeDistricts(layout: CityLayout, size: number): District[] {
-  const { gridSize } = layout.config;
   const { pitch } = layout;
-  const districts: District[] = [];
+  return districtCells(layout.config.gridSize, size).map(({ i0, j0, i1, j1 }) => ({
+    bounds: { minX: i0 * pitch, minZ: j0 * pitch, maxX: i1 * pitch, maxZ: j1 * pitch },
+    gangsters: [],
+    contested: false,
+    captured: false,
+  }));
+}
+
+/** Rozsahy bloků jednotlivých čtvrtí, horní meze bez svého bloku. */
+function districtCells(
+  gridSize: number,
+  size: number,
+): Array<{ i0: number; j0: number; i1: number; j1: number }> {
+  const cells = [];
   for (let j = 0; j < gridSize; j += size) {
     for (let i = 0; i < gridSize; i += size) {
-      districts.push({
-        bounds: {
-          minX: i * pitch,
-          minZ: j * pitch,
-          maxX: Math.min(i + size, gridSize) * pitch,
-          maxZ: Math.min(j + size, gridSize) * pitch,
-        },
-        gangsters: [],
-        contested: false,
-        captured: false,
+      cells.push({
+        i0: i,
+        j0: j,
+        i1: Math.min(i + size, gridSize),
+        j1: Math.min(j + size, gridSize),
       });
     }
   }
-  return districts;
+  return cells;
 }

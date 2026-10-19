@@ -1,15 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { generateCity } from '@/city/layout';
+import { DEFAULT_CITY_CONFIG, generateCity, rectContains } from '@/city/layout';
 import { CityCollision } from '@/city/collision';
 import { createRng } from '@/core/rng';
 import { Body } from '@/people/body';
 import { Gangster, type Target } from '@/people/gangster';
 import { Pistol, MAGAZINE } from '@/game/pistol';
-import { DEFAULT_GANG_WAR, GangWar, makeDistricts, POINTS } from '@/game/gangwar';
+import { DEFAULT_GANG_WAR, GangWar, makeDistricts, planTurf, POINTS } from '@/game/gangwar';
 
-const layout = generateCity();
+const config = DEFAULT_CITY_CONFIG;
+const spawn = Math.floor(config.gridSize / 2) * (config.blockSize + config.streetWidth);
+const options = { ...DEFAULT_GANG_WAR, safe: { x: spawn, z: spawn } };
+const turf = planTurf(config, options, createRng(1));
+const layout = generateCity({ parks: turf.parks });
 const world = new CityCollision(layout);
-const spawn = Math.floor(layout.config.gridSize / 2) * layout.pitch;
 
 describe('CityCollision.raycast', () => {
   it('stops at a building and passes down an empty street', () => {
@@ -86,6 +89,38 @@ describe('Gangster', () => {
     expect(shots).toBeGreaterThan(1);
   });
 
+  it('patrols around the block, never into it, and idles facing the street', () => {
+    const rng = createRng(3);
+    const gangster = new Gangster(block.sidewalk, block.plot, rng, world);
+    const nobody: Target = { position: { x: -1e3, y: 1.7, z: -1e3 }, alive: false, inCar: false };
+    const p = block.plot;
+    let standing = 0;
+    let facingStreet = 0;
+    let travelled = 0;
+
+    for (let t = 0; t < 120; t += 1 / 30) {
+      const before = { x: gangster.body.x, z: gangster.body.z };
+      gangster.update(1 / 30, nobody, world, rng);
+      const { x, z } = gangster.body;
+      travelled += Math.hypot(x - before.x, z - before.z);
+      expect(rectContains(p, x, z)).toBe(false);
+
+      if (gangster.body.walking) continue;
+      const outside = [
+        { amount: p.minZ - z, normal: { x: 0, z: -1 } },
+        { amount: x - p.maxX, normal: { x: 1, z: 0 } },
+        { amount: z - p.maxZ, normal: { x: 0, z: 1 } },
+        { amount: p.minX - x, normal: { x: -1, z: 0 } },
+      ].reduce((best, side) => (side.amount > best.amount ? side : best));
+      const f = gangster.body.forward();
+      standing++;
+      if (f.x * outside.normal.x + f.z * outside.normal.z > 0.5) facingStreet++;
+    }
+
+    expect(travelled).toBeGreaterThan(20);
+    expect(facingStreet / standing).toBeGreaterThan(0.8);
+  });
+
   it('dies after enough hits and stays down', () => {
     const gangster = new Gangster(block.sidewalk, block.plot, createRng(2), world);
     expect(gangster.damage(40)).toBe(false);
@@ -97,11 +132,9 @@ describe('Gangster', () => {
 });
 
 describe('GangWar', () => {
-  const options = { ...DEFAULT_GANG_WAR, safe: { x: spawn, z: spawn } };
-
   it('splits the city into districts and gangs up in some, away from the start', () => {
     expect(makeDistricts(layout, 2)).toHaveLength(16);
-    const war = new GangWar(layout, options, world, createRng(3));
+    const war = new GangWar(layout, options, turf, world, createRng(3));
     expect(war.contested).toBe(DEFAULT_GANG_WAR.held);
     for (const d of war.districts.filter((x) => x.contested)) {
       expect(d.gangsters.length).toBeGreaterThanOrEqual(DEFAULT_GANG_WAR.gangstersPerDistrict.min);
@@ -114,8 +147,23 @@ describe('GangWar', () => {
     }
   });
 
+  it('gives every gang district exactly one park, and leaves the rest of the city without', () => {
+    const war = new GangWar(layout, options, turf, world, createRng(3));
+    const parks = layout.blocks.filter((b) => b.isPark);
+    for (const district of war.districts) {
+      const own = parks.filter((b) =>
+        rectContains(
+          district.bounds,
+          (b.plot.minX + b.plot.maxX) / 2,
+          (b.plot.minZ + b.plot.maxZ) / 2,
+        ),
+      );
+      expect(own).toHaveLength(district.contested ? 1 : 0);
+    }
+  });
+
   it('scores kills and head shots, and takes a district once it is cleared', () => {
-    const war = new GangWar(layout, options, world, createRng(4));
+    const war = new GangWar(layout, options, turf, world, createRng(4));
     const district = war.districts.find((d) => d.contested);
     if (!district) throw new Error('no gang district');
     const open = (max: number): number => max;
@@ -136,7 +184,7 @@ describe('GangWar', () => {
   });
 
   it('does not shoot through walls', () => {
-    const war = new GangWar(layout, options, world, createRng(5));
+    const war = new GangWar(layout, options, turf, world, createRng(5));
     const target = war.gangsters[0];
     if (!target) throw new Error('no gangster');
     const { x, z } = target.body;
@@ -146,7 +194,7 @@ describe('GangWar', () => {
   });
 
   it('hurts the player under fire, heals after a lull, and respawns at full health', () => {
-    const war = new GangWar(layout, options, world, createRng(6));
+    const war = new GangWar(layout, options, turf, world, createRng(6));
     const gangster = war.gangsters[0];
     if (!gangster) throw new Error('no gangster');
     const rng = createRng(7);

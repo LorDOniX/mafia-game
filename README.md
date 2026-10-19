@@ -155,7 +155,6 @@ Notes that matter in practice:
   carry their own colour, you may want to flatten those toward white.
 - **`public/` is the only durable place for assets.** `dist/` is build output:
   it is gitignored, and Vite empties it on every build. Keep raw downloads in
-  `assets-src/`, which is neither served nor bundled.
 
 ### The two asphalt layers
 
@@ -251,14 +250,6 @@ Preparing the image:
 If the image fails to load, the building keeps the custom layout but shows
 procedural stucco instead, tiled to the same bay grid.
 
-The shipped `granite-grid.jpg` is cropped from
-`assets-src/textures/facades/granite-grid.avif` with:
-
-```bash
-ffmpeg -i assets-src/textures/facades/granite-grid.avif -vf "crop=2134:1654:54:53" \
-  -q:v 3 public/textures/facades/granite-grid.jpg
-```
-
 ### Using your own sky
 
 The skybox is a cube map. Set `SKY` in `src/city/assets.ts` to one of:
@@ -341,7 +332,6 @@ colour map, so any of them drops in by changing `url`.
 Already in use: the car is Kenney's
 [Car Kit](https://kenney.nl/assets/car-kit) (CC0), and the roadway is ambientCG's
 [Road008B](https://ambientcg.com/view?id=Road008B) (CC0). The full pack is kept
-in `assets-src/textures/road/`; only the Color and NormalGL maps are served.
 
 All CC0 (public domain, no attribution required):
 
