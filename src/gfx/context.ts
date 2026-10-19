@@ -1,7 +1,9 @@
 export interface GLContext {
   gl: WebGL2RenderingContext;
   canvas: HTMLCanvasElement;
-  /** Změní velikost drawing bufferu na CSS velikost * DPR. Vrací true, pokud se změnila. */
+  /** Podíl plného rozlišení na každé ose; prohlížeč obraz roztáhne na celou plochu. */
+  scale: number;
+  /** Změní velikost drawing bufferu na CSS velikost * DPR * scale. Vrací true, pokud se změnila. */
   resize(): boolean;
 }
 
@@ -18,7 +20,7 @@ export function createContext(canvas: HTMLCanvasElement): GLContext {
   }
 
   function resize(): boolean {
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const dpr = Math.min(window.devicePixelRatio || 1, 2) * context.scale;
     const width = Math.max(1, Math.round(canvas.clientWidth * dpr));
     const height = Math.max(1, Math.round(canvas.clientHeight * dpr));
 
@@ -30,6 +32,7 @@ export function createContext(canvas: HTMLCanvasElement): GLContext {
     return true;
   }
 
+  const context: GLContext = { gl, canvas, scale: 1, resize };
   resize();
-  return { gl, canvas, resize };
+  return context;
 }

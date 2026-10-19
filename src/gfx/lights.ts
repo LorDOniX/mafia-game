@@ -1,4 +1,5 @@
 import type { Vec3 } from '@/math/vec3';
+import type { Mat4 } from '@/math/mat4';
 import lightsSource from '@/shaders/lights.glsl?raw';
 
 /** Musí odpovídat MAX_LIGHTS v lights.glsl. */
@@ -54,6 +55,35 @@ export function nearestLights(
       ? light
       : { ...light, color: [light.color[0] * fade, light.color[1] * fade, light.color[2] * fade] };
   });
+}
+
+/**
+ * Světla, jejichž koule dosahu zasahuje do záběru kamery a neleží dál než
+ * `maxDistance` od `eye`. Ostatní nemohou osvětlit žádný viditelný pixel, takže
+ * by ve shaderu jen zabírala sloty. `viewProjection` je column-major jako ve WebGL.
+ */
+export function visibleLights(
+  lights: readonly SpotLight[],
+  viewProjection: Mat4,
+  eye: Vec3,
+  maxDistance = Infinity,
+): SpotLight[] {
+  const m = viewProjection;
+  const row = (i: number): number[] => [0, 4, 8, 12].map((k) => m[k + i] ?? 0);
+  const [r0, r1, r2, r3] = [row(0), row(1), row(2), row(3)];
+  // Levá, pravá, dolní, horní, blízká a vzdálená rovina (Gribb–Hartmann).
+  const planes = [r0, r0, r1, r1, r2, r2].map((r, i) => {
+    const sign = i % 2 === 0 ? 1 : -1;
+    const p = r3.map((w, k) => w + sign * (r[k] ?? 0));
+    const length = Math.hypot(p[0] ?? 0, p[1] ?? 0, p[2] ?? 0) || 1;
+    return p.map((v) => v / length);
+  });
+
+  return lights.filter(
+    ({ position: { x, y, z }, range }) =>
+      Math.hypot(x - eye.x, y - eye.y, z - eye.z) - range < maxDistance &&
+      planes.every(([a = 0, b = 0, c = 0, d = 0]) => a * x + b * y + c * z + d > -range),
+  );
 }
 
 /** Zabalí světla do tří polí vec4, která čte lights.glsl. */

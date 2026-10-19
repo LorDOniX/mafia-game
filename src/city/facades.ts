@@ -36,6 +36,11 @@ export interface CustomFacade {
   url: string;
   /** Volitelná normal mapa v tangent space, konvence OpenGL. Když chybí, je plochá. */
   normalUrl?: string;
+  /**
+   * Volitelná noční fotka téže stěny, oříznutá stejně jako `url`. Po setmění
+   * svítí sama, takže rozsvícená okna v ní zůstanou rozsvícená.
+   */
+  nightUrl?: string;
   span: FacadeSpan;
   /**
    * Násobí texturu. Výchozí je bílá: fotografie mají vlastní barvu, na rozdíl
@@ -48,6 +53,14 @@ export interface CustomFacade {
 /** Vrstva texture array pro `index`-tou vlastní fasádu. */
 export const customFacadeLayer = (index: number): SurfaceLayer => BUILTIN_LAYER_COUNT + index;
 
+/** Noční vrstvy leží za všemi vlastními fasádami, jen pro ty, které mají `nightUrl`. */
+export function customFacadeNightLayers(
+  facades: readonly CustomFacade[],
+): Array<SurfaceLayer | undefined> {
+  let next = customFacadeLayer(facades.length);
+  return facades.map((facade) => (facade.nightUrl ? next++ : undefined));
+}
+
 /**
  * Umístí vlastní fasády na budovy vybrané jejich cíli, na místě.
  *
@@ -56,8 +69,10 @@ export const customFacadeLayer = (index: number): SurfaceLayer => BUILTIN_LAYER_
  * to znamená, že se pod ním změnilo rozvržení města.
  */
 export function applyCustomFacades(layout: CityLayout, facades: readonly CustomFacade[]): void {
+  const nightLayers = customFacadeNightLayers(facades);
   facades.forEach((facade, index) => {
     const layer = customFacadeLayer(index);
+    const night = nightLayers[index];
 
     for (const target of facade.targets) {
       const matched = selectBuildings(layout.buildings, target);
@@ -70,6 +85,8 @@ export function applyCustomFacades(layout: CityLayout, facades: readonly CustomF
         building.facade = layer;
         building.facadeSpan = facade.span;
         building.tint = [...(facade.tint ?? [1, 1, 1])];
+        if (night === undefined) delete building.nightFacade;
+        else building.nightFacade = night;
       }
     }
   });

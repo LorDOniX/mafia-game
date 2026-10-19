@@ -3,7 +3,16 @@ import { generateCity, rectContains } from '@/city/layout';
 import { CityCollision } from '@/city/collision';
 import { createLampModel, lampLight, lampTransform } from '@/city/lamp';
 import { FLOATS_PER_MODEL_VERTEX } from '@/gfx/gltf';
-import { LightBuffer, MAX_LIGHTS, nearestLights, withLights, type SpotLight } from '@/gfx/lights';
+import {
+  LightBuffer,
+  MAX_LIGHTS,
+  nearestLights,
+  visibleLights,
+  withLights,
+  type SpotLight,
+} from '@/gfx/lights';
+import { AdaptiveResolution } from '@/gfx/resolution';
+import { Camera } from '@/core/camera';
 import { transformPoint } from '@/math/mat4';
 
 const city = generateCity();
@@ -79,6 +88,48 @@ describe('street lamps', () => {
     if (!lamp) throw new Error('no lamp facing along z');
     const tip = transformPoint(lampTransform(lamp, 0), { x: 0, y: 0, z: 1 });
     expect(tip.z - lamp.z).toBeCloseTo(Math.cos(lamp.rotation));
+  });
+});
+
+describe('visibleLights', () => {
+  const camera = new Camera();
+  camera.aspect = 16 / 9;
+  camera.update();
+
+  it('keeps lights ahead and drops those well behind or too far', () => {
+    const ahead = light(0, -50);
+    const behind = light(0, 50);
+    const far = light(0, -400);
+    const all = [ahead, behind, far];
+    expect(visibleLights(all, camera.viewProjection, camera.position, 250)).toEqual([ahead]);
+  });
+
+  it('keeps a light behind the camera whose reach spills into view', () => {
+    const close = light(0, 10);
+    expect(visibleLights([close], camera.viewProjection, camera.position)).toEqual([close]);
+  });
+});
+
+describe('AdaptiveResolution', () => {
+  const run = (res: AdaptiveResolution, fps: number, seconds: number): void => {
+    for (let t = 0; t < seconds; t += 1 / fps) res.update(1 / fps);
+  };
+
+  it('drops resolution while slow, then slowly recovers', () => {
+    const res = new AdaptiveResolution();
+    run(res, 35, 2.5);
+    expect(res.scale).toBeCloseTo(0.8);
+    run(res, 35, 20);
+    expect(res.scale).toBeCloseTo(0.5);
+    run(res, 60, 4.5);
+    expect(res.scale).toBeCloseTo(0.55);
+  });
+
+  it('holds steady inside the comfort band', () => {
+    const res = new AdaptiveResolution();
+    res.scale = 0.7;
+    run(res, 54, 10);
+    expect(res.scale).toBeCloseTo(0.7);
   });
 });
 

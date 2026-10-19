@@ -45,7 +45,8 @@ import { Speedometer } from '@/ui/speedometer';
 import { ClockDial } from '@/ui/clock';
 import { daylightAt, GameClock } from '@/game/clock';
 import { bakeInstances } from '@/gfx/batch';
-import { MAX_LIGHTS, nearestLights, type SpotLight } from '@/gfx/lights';
+import { MAX_LIGHTS, nearestLights, visibleLights, type SpotLight } from '@/gfx/lights';
+import { AdaptiveResolution } from '@/gfx/resolution';
 import { flashlight } from '@/core/flashlight';
 import type { Model, ModelInstance } from '@/gfx/model';
 import { identity, type Mat4 } from '@/math/mat4';
@@ -69,6 +70,8 @@ const RECOIL = 0.015;
 /** Záblesk z hlavně: jasný, široký a krátký. */
 const FLASH_COLOR: [number, number, number] = [80, 60, 30];
 const FLASH_RANGE = 14;
+/** Za touto vzdáleností je v noční mlze vše skoro neviditelné, takže tam světla nesvítí. */
+const LIGHT_CULL_DISTANCE = 250;
 
 /** Auto mimo provoz: to, které hráč řídí, nebo jedno ponechané zaparkované. */
 interface FreeCar {
@@ -333,6 +336,7 @@ async function main(): Promise<void> {
   overlay.hidden = false;
   let hudTimer = 0;
   let fps = 0;
+  const resolution = new AdaptiveResolution();
 
   const flashLight = (flash: Flash): SpotLight => {
     const fade = 1 - flash.age / 0.07;
@@ -364,9 +368,13 @@ async function main(): Promise<void> {
     });
     const cars = traffic.cars.map((c) => c.vehicle);
     if (driven) cars.push(driven.vehicle);
-    const beams = nearestLights(cars.map(headlight), camera.position, HEADLIGHT_SLOTS);
+    // Jen světla, která mohou osvětlit něco v záběru: každé další stojí každý pixel.
+    camera.update();
+    const seen = (lights: SpotLight[]): SpotLight[] =>
+      visibleLights(lights, camera.viewProjection, camera.position, LIGHT_CULL_DISTANCE);
+    const beams = nearestLights(seen(cars.map(headlight)), camera.position, HEADLIGHT_SLOTS);
     const left = MAX_LIGHTS - own.length - beams.length;
-    const lamps = nearestLights(lampLights, camera.position, left);
+    const lamps = nearestLights(seen(lampLights), camera.position, left);
     return [...own, ...beams.map(dim), ...lamps.map(dim)];
   };
 
@@ -596,13 +604,14 @@ async function main(): Promise<void> {
 
     // Snímkovou frekvenci před zobrazením vyhladit; surové dt každého snímku je nečitelné.
     fps += (1 / Math.max(dt, 1e-6) - fps) * 0.1;
+    if (resolution.update(dt)) ctx.scale = resolution.scale;
 
     hudTimer += dt;
     if (hudTimer >= HUD_INTERVAL) {
       hudTimer = 0;
       const p = camera.position;
       hud.textContent =
-        `${fps.toFixed(0)} fps  |  ${renderer.stats.triangles.toLocaleString()} tris  |  ` +
+        `${fps.toFixed(0)} fps  |  ${Math.round(ctx.scale * 100)}% res  |  ${renderer.stats.triangles.toLocaleString()} tris  |  ` +
         `${driven ? `drive ${Math.abs(driven.vehicle.speed * 3.6).toFixed(0)} km/h` : controller.mode}  |  x ${p.x.toFixed(1)}  y ${p.y.toFixed(1)}  z ${p.z.toFixed(1)}  |  ` +
         `${playTime.toFixed(0)}s`;
     }

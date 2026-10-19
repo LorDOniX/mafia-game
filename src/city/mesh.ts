@@ -1,4 +1,5 @@
 import {
+  BUILTIN_LAYER_COUNT,
   TextureLayer,
   type CityLayout,
   type FacadeSpan,
@@ -6,8 +7,8 @@ import {
   type SurfaceLayer,
 } from './layout';
 
-/** position(3) + normal(3) + tangent(4) + uv(2) + layer(1) + tint(3) */
-export const FLOATS_PER_VERTEX = 16;
+/** position(3) + normal(3) + tangent(4) + uv(2) + layer(1) + tint(3) + night(2) */
+export const FLOATS_PER_VERTEX = 18;
 
 export interface MeshData {
   vertices: Float32Array;
@@ -17,8 +18,14 @@ export interface MeshData {
 type Triple = [number, number, number];
 type UV = [number, number];
 type Tint = readonly [number, number, number];
+/**
+ * Co stěna dělá v noci: [seed, vrstva]. Seed > 0 náhodně rozsvítí procedurální
+ * okna, vrstva >= 0 je noční textura vlastní fasády, která svítí sama.
+ */
+type Night = readonly [number, number];
 
 const WHITE: Tint = [1, 1, 1];
+const NO_NIGHT: Night = [0, -1];
 
 /** Vestavěné fasády se kreslí po jedné okenní ose a jednom podlaží na dlaždici. */
 const SINGLE_BAY: FacadeSpan = { bays: 1, storeys: 1 };
@@ -85,6 +92,7 @@ class MeshBuilder {
     layer: SurfaceLayer,
     tint: Tint,
     shade = false,
+    night: Night = NO_NIGHT,
   ): void {
     const [tangent, handedness] = tangentFrame(corners, uvs, normal);
 
@@ -114,6 +122,8 @@ class MeshBuilder {
         tint[0] * ao,
         tint[1] * ao,
         tint[2] * ao,
+        night[0],
+        night[1],
       );
     }
 
@@ -217,6 +227,7 @@ class MeshBuilder {
     uvH: number,
     layer: SurfaceLayer,
     tint: Tint,
+    night: Night = NO_NIGHT,
   ): void {
     const dx = x1 - x0;
     const dz = z1 - z0;
@@ -239,6 +250,7 @@ class MeshBuilder {
       layer,
       tint,
       true,
+      night,
     );
   }
 
@@ -379,7 +391,7 @@ export function buildCityMesh(layout: CityLayout): MeshData {
     );
 
     for (const building of block.buildings) {
-      const { footprint, height, facade, tint, facadeSpan = SINGLE_BAY } = building;
+      const { footprint, height, facade, tint, facadeSpan = SINGLE_BAY, nightFacade } = building;
       const floors = Math.max(1, Math.round(height / config.floorHeight));
 
       addPerimeterWalls(
@@ -392,6 +404,7 @@ export function buildCityMesh(layout: CityLayout): MeshData {
         undefined,
         floors / facadeSpan.storeys,
         facadeSpan.bays,
+        nightFacade ?? (facade < BUILTIN_LAYER_COUNT ? 'windows' : undefined),
       );
       builder.ground(footprint, height, TextureLayer.Roof, ROOF_TILE);
     }
@@ -455,7 +468,8 @@ function addRoadNetwork(builder: MeshBuilder, layout: CityLayout): void {
  * Stěny kolem obdélníku s normálami mířícími ven.
  *
  * Pořadí rohů je takové, aby otočená normála z `MeshBuilder.wall` směřovala
- * od obdélníku na všech čtyřech stranách.
+ * od obdélníku na všech čtyřech stranách. `night` je buď 'windows' pro náhodně
+ * rozsvícená procedurální okna, nebo vrstva noční textury.
  */
 function addPerimeterWalls(
   builder: MeshBuilder,
@@ -467,6 +481,7 @@ function addPerimeterWalls(
   uvPerMetre: number | undefined,
   uvH: number,
   baysPerTile = 1,
+  night?: 'windows' | SurfaceLayer,
 ): void {
   const width = rect.maxX - rect.minX;
   const depth = rect.maxZ - rect.minZ;
@@ -477,9 +492,19 @@ function addPerimeterWalls(
   const bays = (length: number): number => Math.max(1, Math.round(length / 4)) / baysPerTile;
   const tilesX = uvPerMetre !== undefined ? width * uvPerMetre : bays(width);
   const tilesZ = uvPerMetre !== undefined ? depth * uvPerMetre : bays(depth);
+  // Každá stěna začíná v jiném rohu, takže dostane vlastní seed.
+  const at = (x: number, z: number): Night =>
+    night === undefined ? NO_NIGHT : night === 'windows' ? [wallSeed(x, z), -1] : [0, night];
+  const { minX, minZ, maxX, maxZ } = rect;
 
-  builder.wall(rect.maxX, rect.minZ, rect.minX, rect.minZ, y0, y1, tilesX, uvH, layer, tint);
-  builder.wall(rect.minX, rect.minZ, rect.minX, rect.maxZ, y0, y1, tilesZ, uvH, layer, tint);
-  builder.wall(rect.minX, rect.maxZ, rect.maxX, rect.maxZ, y0, y1, tilesX, uvH, layer, tint);
-  builder.wall(rect.maxX, rect.maxZ, rect.maxX, rect.minZ, y0, y1, tilesZ, uvH, layer, tint);
+  builder.wall(maxX, minZ, minX, minZ, y0, y1, tilesX, uvH, layer, tint, at(maxX, minZ));
+  builder.wall(minX, minZ, minX, maxZ, y0, y1, tilesZ, uvH, layer, tint, at(minX, minZ));
+  builder.wall(minX, maxZ, maxX, maxZ, y0, y1, tilesX, uvH, layer, tint, at(minX, maxZ));
+  builder.wall(maxX, maxZ, maxX, minZ, y0, y1, tilesZ, uvH, layer, tint, at(maxX, maxZ));
+}
+
+/** Deterministický seed stěny v (0, 1], aby každá měla jiná rozsvícená okna. */
+function wallSeed(x: number, z: number): number {
+  const h = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453;
+  return 0.05 + 0.95 * (h - Math.floor(h));
 }

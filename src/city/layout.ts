@@ -47,6 +47,8 @@ export interface Building {
   facade: SurfaceLayer;
   /** Chybí-li, jde o jednu osu na jedno podlaží, tak jsou kresleny vestavěné fasády. */
   facadeSpan?: FacadeSpan;
+  /** Vrstva textury, která v noci svítí místo náhodně rozsvícených oken. */
+  nightFacade?: SurfaceLayer;
   tint: [number, number, number];
 }
 

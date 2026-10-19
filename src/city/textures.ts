@@ -54,6 +54,14 @@ export function createFlatNormalMap(): HTMLCanvasElement {
   return canvas;
 }
 
+/** Černá vrstva: noční textura, která nesvítí vůbec. */
+export function createUnlitTexture(): HTMLCanvasElement {
+  const { canvas, ctx } = createCanvas();
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, ART_SIZE, ART_SIZE);
+  return canvas;
+}
+
 /** Barvy oken podle vrstvy fasády: cihla má tmavší truhlářské prvky než omítka. */
 const FACADE_TRIM: Partial<Record<TextureLayer, { frame: string; sill: string }>> = {
   [TextureLayer.Brick]: { frame: '#2e2722', sill: '#6d675e' },

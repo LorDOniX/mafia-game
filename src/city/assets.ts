@@ -1,8 +1,9 @@
 import { TextureLayer } from './layout';
-import { customFacadeLayer, type CustomFacade } from './facades';
+import { customFacadeLayer, customFacadeNightLayers, type CustomFacade } from './facades';
 import {
   createFlatNormalMap,
   createSurfaceTextures,
+  createUnlitTexture,
   overlayFacadeWindow,
   repeatFacadeTile,
   TEXTURE_SIZE,
@@ -94,6 +95,7 @@ export const CUSTOM_FACADES: readonly CustomFacade[] = [
     // Zdrojová fotka je v assets-src/textures/facades/.
     name: 'granite-grid',
     url: '/textures/facades/granite-grid.jpg',
+    nightUrl: '/textures/facades/granite-grid-night.jpg',
     span: { bays: 9, storeys: 7 },
     targets: [
       // Nárožní blok vpředu a vpravo od místa spawnu.
@@ -105,6 +107,7 @@ export const CUSTOM_FACADES: readonly CustomFacade[] = [
     // Zdrojová fotka je v assets-src/textures/facades/.
     name: 'granite-grid',
     url: '/textures/facades/granite-grid.jpg',
+    nightUrl: '/textures/facades/granite-grid-night.jpg',
     span: { bays: 9, storeys: 7 },
     targets: [
       // Nárožní blok vpředu a vpravo od místa spawnu.
@@ -285,7 +288,7 @@ export interface ResolvedSky {
 }
 
 export interface CityAssets {
-  /** Jeden canvas na TextureLayer, pak jeden na vlastní fasádu, vše čtverce TEXTURE_SIZE. */
+  /** Canvas na TextureLayer, pak na vlastní fasádu a jejich noční verze; čtverce TEXTURE_SIZE. */
   surfaces: HTMLCanvasElement[];
   /** Odpovídající normal mapy, ploché tam, kde vrstva žádnou nemá. */
   normals: HTMLCanvasElement[];
@@ -347,6 +350,16 @@ async function loadSurfaceTextures(): Promise<HTMLCanvasElement[]> {
       } catch (error) {
         console.warn(`Custom facade "${facade.name}" falls back to plaster:`, error);
         surfaces[layer] = repeatFacadeTile(plaster, facade.span.bays, facade.span.storeys);
+      }
+    }),
+    ...CUSTOM_FACADES.map(async (facade, index) => {
+      const layer = customFacadeNightLayers(CUSTOM_FACADES)[index];
+      if (layer === undefined || !facade.nightUrl) return;
+      try {
+        surfaces[layer] = rasterise(await loadImageBitmap(facade.nightUrl), TEXTURE_SIZE);
+      } catch (error) {
+        console.warn(`Custom facade "${facade.name}" stays dark at night:`, error);
+        surfaces[layer] = createUnlitTexture();
       }
     }),
   ]);

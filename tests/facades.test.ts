@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import { applyCustomFacades, customFacadeLayer, type CustomFacade } from '@/city/facades';
+import {
+  applyCustomFacades,
+  customFacadeLayer,
+  customFacadeNightLayers,
+  type CustomFacade,
+} from '@/city/facades';
 import { CUSTOM_FACADES } from '@/city/assets';
 import { buildCityMesh, FLOATS_PER_VERTEX } from '@/city/mesh';
 import {
@@ -29,6 +34,15 @@ describe('applyCustomFacades', () => {
     expect(BUILTIN_LAYER_COUNT).toBe(Object.keys(TextureLayer).length);
     expect(Math.max(...Object.values(TextureLayer))).toBe(BUILTIN_LAYER_COUNT - 1);
     expect(customFacadeLayer(0)).toBe(BUILTIN_LAYER_COUNT);
+  });
+
+  it('puts night layers after all custom facades, only for those that have one', () => {
+    const list = [facade({ nightUrl: '/a.jpg' }), facade(), facade({ nightUrl: '/b.jpg' })];
+    expect(customFacadeNightLayers(list)).toEqual([
+      customFacadeLayer(3),
+      undefined,
+      customFacadeLayer(4),
+    ]);
   });
 
   it('retextures only the building standing on the target point', () => {

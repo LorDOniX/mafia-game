@@ -15,17 +15,23 @@ vec3 spotLights(vec3 worldPos, vec3 n) {
     if (i >= u_lightCount) break;
 
     vec3 toLight = u_lightPos[i].xyz - worldPos;
-    float dist = length(toLight);
     float range = u_lightPos[i].w;
-    if (dist >= range) continue;
+    // Kvadrát vzdálenosti, aby vzdálená světla nestála odmocninu.
+    float d2 = dot(toLight, toLight);
+    float r2 = d2 / (range * range);
+    if (r2 >= 1.0) continue;
 
-    vec3 l = toLight / dist;
+    vec3 l = toLight * inversesqrt(d2);
+    float facing = dot(n, l);
+    if (facing <= 0.0) continue;
     float cone = smoothstep(u_lightDir[i].w, u_lightColor[i].w, dot(-l, u_lightDir[i].xyz));
-    // Inverzní kvadrát s oknem, aby na hranici dosahu klesl přesně na nulu.
-    float window = clamp(1.0 - pow(dist / range, 4.0), 0.0, 1.0);
-    float falloff = window * window / (dist * dist + 1.0);
+    if (cone <= 0.0) continue;
 
-    total += u_lightColor[i].rgb * max(dot(n, l), 0.0) * cone * falloff;
+    // Inverzní kvadrát s oknem, aby na hranici dosahu klesl přesně na nulu.
+    float window = 1.0 - r2 * r2;
+    float falloff = window * window / (d2 + 1.0);
+
+    total += u_lightColor[i].rgb * facing * cone * falloff;
   }
   return total;
 }

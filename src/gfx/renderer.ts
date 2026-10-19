@@ -81,6 +81,7 @@ export class Renderer {
       { name: 'a_uv', size: 2 },
       { name: 'a_layer', size: 1 },
       { name: 'a_tint', size: 3 },
+      { name: 'a_night', size: 2 },
     ]);
     this.stats = { triangles: data.indices.length / 3 };
 
@@ -135,6 +136,7 @@ export class Renderer {
     if (u['u_fogColor']) gl.uniform3fv(u['u_fogColor'], fogColor);
     if (u['u_fogDensity']) gl.uniform1f(u['u_fogDensity'], fogDensity);
     if (u['u_normalStrength']) gl.uniform1f(u['u_normalStrength'], NORMAL_STRENGTH);
+    if (u['u_night']) gl.uniform1f(u['u_night'], scene.lightsOn);
     if (u['u_atlas']) gl.uniform1i(u['u_atlas'], 0);
     if (u['u_normals']) gl.uniform1i(u['u_normals'], 1);
     this.lights.upload(gl, u);
