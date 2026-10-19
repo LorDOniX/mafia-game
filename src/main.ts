@@ -59,8 +59,8 @@ import { CombatHud } from '@/ui/combat-hud';
 
 const HUD_INTERVAL = 0.25;
 const PLAYER_CAR_COLOR = '#e0b84a';
-/** Sloty světel v shaderu vyhrazené pro světlomety; zbytek dostanou pouliční lampy. */
-const HEADLIGHT_SLOTS = 8;
+/** Kolik nejbližších viditelných světlometů svítí; zbytek z MAX_LIGHTS dostanou lampy. */
+const HEADLIGHT_SLOTS = 64;
 /** Místo, které hráč zabírá pěšky, aby provoz zastavil před ním. */
 const PEDESTRIAN_RADIUS = 0.4;
 /** Sekundy mezi pádem a opětovným vstáním na startu. */

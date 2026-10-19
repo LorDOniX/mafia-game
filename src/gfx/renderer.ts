@@ -116,7 +116,7 @@ export class Renderer {
       (c, i) => c + (glow[i] ?? 0),
     ) as RGB;
     const fogDensity = NIGHT_FOG_DENSITY + (FOG_DENSITY - NIGHT_FOG_DENSITY) * daylight;
-    this.lights.set(scene.lights);
+    this.lights.set(scene.lights, camera, this.ctx.canvas.width, this.ctx.canvas.height);
 
     gl.clearColor(fogColor[0], fogColor[1], fogColor[2], 1);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);

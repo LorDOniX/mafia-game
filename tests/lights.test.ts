@@ -4,15 +4,18 @@ import { CityCollision } from '@/city/collision';
 import { createLampModel, lampLight, lampTransform } from '@/city/lamp';
 import { FLOATS_PER_MODEL_VERTEX } from '@/gfx/gltf';
 import {
+  CLUSTERS,
   LightBuffer,
   MAX_LIGHTS,
   nearestLights,
+  sliceOf,
   visibleLights,
   withLights,
   type SpotLight,
 } from '@/gfx/lights';
 import { AdaptiveResolution } from '@/gfx/resolution';
 import { Camera } from '@/core/camera';
+import { createRng } from '@/core/rng';
 import { transformPoint } from '@/math/mat4';
 
 const city = generateCity();
@@ -159,20 +162,70 @@ describe('nearestLights', () => {
 });
 
 describe('LightBuffer', () => {
+  const camera = new Camera();
+  camera.aspect = 16 / 9;
+  camera.update();
+
   it('packs range and cone cosines into the w components', () => {
     const buffer = new LightBuffer();
-    buffer.set([light(3, 4)]);
+    buffer.set([light(3, 4)], camera);
 
+    const row = MAX_LIGHTS * 4;
     expect(buffer.count).toBe(1);
-    expect(Array.from(buffer.position.subarray(0, 4))).toEqual([3, 5, 4, 20]);
-    expect(buffer.direction[3]).toBeCloseTo(Math.cos(1));
-    expect(buffer.color[3]).toBeCloseTo(Math.cos(0.5));
+    expect(Array.from(buffer.data.subarray(0, 4))).toEqual([3, 5, 4, 20]);
+    expect(buffer.data[row + 3]).toBeCloseTo(Math.cos(1));
+    expect(buffer.data[2 * row + 3]).toBeCloseTo(Math.cos(0.5));
   });
 
   it('caps at the shader limit', () => {
     const buffer = new LightBuffer();
-    buffer.set(Array.from({ length: MAX_LIGHTS + 5 }, (_, i) => light(i, 0)));
+    buffer.set(
+      Array.from({ length: MAX_LIGHTS + 5 }, (_, i) => light(i, 0)),
+      camera,
+    );
     expect(buffer.count).toBe(MAX_LIGHTS);
+  });
+
+  it('leaves out lights that cannot reach anything in view', () => {
+    const buffer = new LightBuffer();
+    buffer.set([light(0, 100), light(0, -1000)], camera);
+    expect(buffer.indexCount).toBe(0);
+  });
+
+  it('keeps a light out of clusters far off to the side', () => {
+    const buffer = new LightBuffer();
+    buffer.set([light(0, -30)], camera);
+    const slice = sliceOf(30);
+    expect(buffer.lightsIn(8, 5, slice)).toEqual([0]);
+    expect(buffer.lightsIn(0, 0, slice)).toEqual([]);
+    expect(buffer.lightsIn(CLUSTERS.x - 1, 0, slice)).toEqual([]);
+  });
+
+  it('lists every light that reaches a point in that point\'s cluster', () => {
+    const rng = createRng(7);
+    const lights = Array.from({ length: 40 }, () => ({
+      ...light(rng.range(-60, 60), rng.range(-150, 20)),
+      range: rng.range(5, 35),
+    }));
+    const buffer = new LightBuffer();
+    buffer.set(lights, camera);
+
+    const tanY = Math.tan(camera.fov / 2);
+    const tanX = tanY * camera.aspect;
+    for (let n = 0; n < 4000; n++) {
+      // Kamera stojí v počátku a dívá se podél -Z, takže view prostor je svět.
+      const nx = rng.range(-0.999, 0.999);
+      const ny = rng.range(-0.999, 0.999);
+      const depth = rng.range(0.2, 200);
+      const p = { x: nx * depth * tanX, y: ny * depth * tanY, z: -depth };
+      const tile = (ndc: number, tiles: number): number => Math.floor(((ndc + 1) / 2) * tiles);
+      const listed = buffer.lightsIn(tile(nx, CLUSTERS.x), tile(ny, CLUSTERS.y), sliceOf(depth));
+
+      lights.forEach((l, i) => {
+        const d = Math.hypot(l.position.x - p.x, l.position.y - p.y, l.position.z - p.z);
+        if (d < l.range * 0.999) expect(listed).toContain(i);
+      });
+    }
   });
 });
 
@@ -180,7 +233,7 @@ describe('withLights', () => {
   it('splices the light code in place of the include', () => {
     const source = withLights('#version 300 es\n#include "lights.glsl"\nvoid main() {}');
     expect(source).toContain('vec3 spotLights(');
-    expect(source).toContain(`#define MAX_LIGHTS ${MAX_LIGHTS}`);
+    expect(source).toContain(`#define CLUSTERS_Z ${CLUSTERS.z}`);
     expect(source).not.toContain('#include');
   });
 });
