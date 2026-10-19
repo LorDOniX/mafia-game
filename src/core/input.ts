@@ -29,10 +29,14 @@ const GAME_KEYS = new Set([
   'Tab',
 ]);
 
+/** Jak dlouho po ztrátě zámku Esc ještě nepokračuje: tentýž stisk může doručit keydown až po uvolnění. */
+const RESUME_GUARD_MS = 250;
+
 export class Input {
   private readonly held = new Set<string>();
   private readonly pressedThisFrame = new Set<string>();
   private readonly teardown: Array<() => void> = [];
+  private unlockedAt = -Infinity;
 
   /** Nasčítaný pohyb myši od posledního `endFrame()`, v surových pixelech. */
   readonly lookDelta: Vec2 = vec2();
@@ -43,10 +47,11 @@ export class Input {
       if (!this.held.has(e.code)) this.pressedThisFrame.add(e.code);
       this.held.add(e.code);
 
-      // Escape uvolní zámek. Prohlížeče to dělají samy, ale explicitní volání
-      // zajišťuje všude stejné chování.
+      // Escape přepíná pauzu: ve hře uvolní zámek (prohlížeče to dělají samy, ale
+      // explicitní volání zajišťuje všude stejné chování), v menu ho znovu zachytí.
       if (e.code === 'Escape') {
-        document.exitPointerLock();
+        if (this.pointerLocked) document.exitPointerLock();
+        else if (performance.now() - this.unlockedAt > RESUME_GUARD_MS) this.requestPointerLock();
         return;
       }
 
@@ -72,8 +77,10 @@ export class Input {
     const onMouseUp = (e: MouseEvent): void => void this.held.delete(`Mouse${e.button}`);
 
     const onLockChange = (): void => {
+      const wasLocked = this.pointerLocked;
       this.pointerLocked = document.pointerLockElement === canvas;
       if (!this.pointerLocked) {
+        if (wasLocked) this.unlockedAt = performance.now();
         // Klávesy držené při ztrátě fokusu by jinak zůstaly zaseknuté dole.
         this.held.clear();
         this.lookDelta.x = 0;

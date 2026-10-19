@@ -237,6 +237,23 @@
         pointer-events: none;
       }
 
+      #bigmap {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        width: min(86vh, 86vw);
+        height: min(86vh, 86vw);
+        transform: translate(-50%, -50%);
+        border: 2px solid rgba(216, 201, 163, 0.75);
+        border-radius: 6px;
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.75);
+        pointer-events: none;
+      }
+
+      #bigmap[hidden] {
+        display: none;
+      }
+
       #speedometer {
         position: fixed;
         right: 12px;
@@ -297,6 +314,7 @@
     <canvas id="clock"></canvas>
     <button id="daynight" type="button">Skip to evening (N)</button>
     <canvas id="speedometer" hidden></canvas>
+    <canvas id="bigmap" hidden></canvas>
 
     <div id="overlay">
       <h1>Lost Heaven</h1>
@@ -326,8 +344,10 @@
         <dd>flashlight</dd>
         <dt>Space</dt>
         <dd>handbrake (car)</dd>
+        <dt>Tab (hold)</dt>
+        <dd>city map</dd>
         <dt>Esc</dt>
-        <dd>release cursor</dd>
+        <dd>pause / resume</dd>
       </dl>
       <p class="prompt" id="prompt">Click to enter the city</p>
     </div>

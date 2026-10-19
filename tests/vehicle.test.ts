@@ -13,7 +13,7 @@ const model = parseGlb(
 const config = { url: '', scale: 1.4, spinPrefix: 'wheel-', steerPrefix: 'wheel-front' };
 const fit = fitVehicle(model, config);
 
-const open: VehicleWorld = { blocked: () => false, groundHeightAt: () => 0 };
+const open: VehicleWorld = { penetration: () => 0, groundHeightAt: () => 0 };
 const drive = (throttle: number, steer = 0): VehicleControls => ({
   throttle,
   steer,
@@ -110,7 +110,7 @@ describe('Vehicle', () => {
   it('stops at a wall instead of driving through it', () => {
     // Zeď přes silnici 20 m vpředu.
     const wall: VehicleWorld = {
-      blocked: (_x, z, radius) => z - radius < -20,
+      penetration: (_x, z, radius) => Math.max(0, -20 - (z - radius)),
       groundHeightAt: () => 0,
     };
     const vehicle = new Vehicle(fit.body, 0, 0, 0);
@@ -123,7 +123,7 @@ describe('Vehicle', () => {
   it('reverses out after driving into a wall at an angle', () => {
     // Stěna budovy podél x = 0, auto do ní najíždí šikmo zprava.
     const wall: VehicleWorld = {
-      blocked: (x, _z, radius) => x - radius < 0,
+      penetration: (x, _z, radius) => Math.max(0, radius - x),
       groundHeightAt: () => 0,
     };
     const vehicle = new Vehicle(fit.body, 3, 0, -0.6);
@@ -132,6 +132,18 @@ describe('Vehicle', () => {
 
     run(vehicle, drive(-1), 2, wall);
     expect(Math.hypot(vehicle.x - stuck.x, vehicle.z - stuck.z)).toBeGreaterThan(3);
+  });
+
+  it('backs out after being wedged into another car', () => {
+    // Jiné auto přímo před ním, příčně, s překryvem zhruba metr.
+    const front = -fit.body.length / 2 + 1;
+    const wedged: VehicleWorld = {
+      penetration: (_x, z, radius) => Math.max(0, front - (z - radius)),
+      groundHeightAt: () => 0,
+    };
+    const vehicle = new Vehicle(fit.body, 0, 0, 0);
+    run(vehicle, drive(-1), 1, wedged);
+    expect(vehicle.z).toBeGreaterThan(1);
   });
 
   it('rolls the wheels by distance over radius', () => {

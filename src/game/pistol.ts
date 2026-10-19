@@ -17,6 +17,11 @@ export class Pistol {
     return this.reloadLeft > 0;
   }
 
+  /** Průběh přebíjení 0..1; mimo přebíjení 0. */
+  get reloadProgress(): number {
+    return this.reloadLeft > 0 ? 1 - this.reloadLeft / RELOAD_TIME : 0;
+  }
+
   update(dt: number): void {
     this.cooldown = Math.max(0, this.cooldown - dt);
     this.kick = Math.max(0, this.kick - dt * KICK_RECOVERY);

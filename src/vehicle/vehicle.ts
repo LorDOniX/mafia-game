@@ -64,8 +64,8 @@ export interface VehicleControls {
 export const PARKED: VehicleControls = { throttle: 0, steer: 0, handbrake: true };
 
 export interface VehicleWorld {
-  /** True, pokud by se kruh v (x, z) překrýval s něčím pevným. */
-  blocked(x: number, z: number, radius: number): boolean;
+  /** Jak hluboko kruh v (x, z) vězí v něčem pevném, v metrech; 0 = volno. */
+  penetration(x: number, z: number, radius: number): number;
   groundHeightAt(x: number, z: number): number;
 }
 
@@ -143,17 +143,24 @@ export class Vehicle {
     const nextX = this.x + Math.sin(heading) * distance;
     const nextZ = this.z - Math.cos(heading) * distance;
 
-    if (this.fits(nextX, nextZ, heading, world)) {
+    // Auto zaklíněné v jiném smí každý pohyb, který ho nezaboří hlouběji.
+    const stuck = this.depth(this.x, this.z, this.heading, world);
+    const fits = (x: number, z: number): boolean => {
+      const d = this.depth(x, z, heading, world);
+      return d === 0 || d < stuck;
+    };
+
+    if (fits(nextX, nextZ)) {
       this.place(nextX, nextZ, heading, distance);
       return;
     }
 
     // Šikmý náraz: klouzat po ose, která je volná, a ztrácet rychlost.
     const scrape = Math.pow(SCRAPE_RETAIN, dt);
-    if (this.fits(nextX, this.z, heading, world)) {
+    if (fits(nextX, this.z)) {
       this.place(nextX, this.z, heading, distance);
       this.speed *= scrape;
-    } else if (this.fits(this.x, nextZ, heading, world)) {
+    } else if (fits(this.x, nextZ)) {
       this.place(this.x, nextZ, heading, distance);
       this.speed *= scrape;
     } else {
@@ -169,8 +176,8 @@ export class Vehicle {
     this.wheelSpin += distance / this.body.wheelRadius;
   }
 
-  /** Kruhy o poloměru poloviny šířky auta, rozmístěné tak, aby pokryly jeho délku. */
-  private fits(x: number, z: number, heading: number, world: VehicleWorld): boolean {
+  /** Největší zaboření kruhů o poloměru poloviny šířky auta, rozmístěných po jeho délce. */
+  private depth(x: number, z: number, heading: number, world: VehicleWorld): number {
     const { length, width } = this.body;
     const radius = width / 2;
     const count = Math.max(1, Math.ceil(length / width));
@@ -178,11 +185,12 @@ export class Vehicle {
     const fx = Math.sin(heading);
     const fz = -Math.cos(heading);
 
+    let deepest = 0;
     for (let i = 0; i < count; i++) {
       const along = count === 1 ? 0 : -reach + (2 * reach * i) / (count - 1);
-      if (world.blocked(x + fx * along, z + fz * along, radius)) return false;
+      deepest = Math.max(deepest, world.penetration(x + fx * along, z + fz * along, radius));
     }
-    return true;
+    return deepest;
   }
 }
 

@@ -44,19 +44,37 @@ const NO_MARKS: MapMarks = { areas: [], dots: [] };
 /** Poloměr tečky osoby, v metrech. */
 const DOT_RADIUS = 1.6;
 
-/** Minimapa se severem nahoře, centrovaná na kameru, s jejím zorným kuželem a všemi auty. */
+/** Nejmenší poloměr tečky osoby na canvasu, v CSS pixelech, aby nezmizela na celé mapě. */
+const MIN_DOT_PX = 2;
+/** Poloměr značky hráče, v CSS pixelech. */
+const PLAYER_PX = 3.5;
+
+/**
+ * Minimapa se severem nahoře, s zorným kuželem kamery a všemi auty. Výchozí je
+ * výřez centrovaný na kameru; `wholeCity` místo toho ukáže celé město najednou.
+ */
 export class Minimap {
   private readonly ctx: CanvasRenderingContext2D;
   private readonly city: HTMLCanvasElement;
+  private readonly range: number;
+  private readonly center: { x: number; z: number } | null;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
     layout: CityLayout,
+    wholeCity = false,
   ) {
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('2D canvas unsupported');
     this.ctx = ctx;
     this.city = bakeCity(layout);
+    const { bounds } = layout;
+    this.range = wholeCity
+      ? Math.max(bounds.maxX - bounds.minX, bounds.maxZ - bounds.minZ) * 1.04
+      : RANGE;
+    this.center = wholeCity
+      ? { x: (bounds.minX + bounds.maxX) / 2, z: (bounds.minZ + bounds.maxZ) / 2 }
+      : null;
   }
 
   draw(view: MapView, cars: readonly MapCar[], marks: MapMarks = NO_MARKS): void {
@@ -68,13 +86,16 @@ export class Minimap {
       canvas.height = size;
     }
 
-    const scale = size / RANGE;
+    const scale = size / this.range;
+    const center = this.center ?? view;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = ROAD;
     ctx.fillRect(0, 0, size, size);
 
-    // Ze světa na canvas: x doprava, z dolů, kamera uprostřed.
-    ctx.setTransform(scale, 0, 0, scale, size / 2 - view.x * scale, size / 2 - view.z * scale);
+    // Ze světa na canvas: x doprava, z dolů, střed výřezu uprostřed.
+    const offsetX = size / 2 - center.x * scale;
+    const offsetZ = size / 2 - center.z * scale;
+    ctx.setTransform(scale, 0, 0, scale, offsetX, offsetZ);
     ctx.imageSmoothingEnabled = true;
     ctx.drawImage(this.city, 0, 0, this.city.width / BAKE_SCALE, this.city.height / BAKE_SCALE);
 
@@ -107,10 +128,11 @@ export class Minimap {
       ctx.restore();
     }
 
+    const dotRadius = Math.max(DOT_RADIUS, (MIN_DOT_PX * dpr) / scale);
     for (const dot of marks.dots) {
       ctx.fillStyle = dot.color;
       ctx.beginPath();
-      ctx.arc(dot.x, dot.z, DOT_RADIUS, 0, Math.PI * 2);
+      ctx.arc(dot.x, dot.z, dotRadius, 0, Math.PI * 2);
       ctx.fill();
     }
 
@@ -119,7 +141,7 @@ export class Minimap {
     ctx.strokeStyle = '#000000';
     ctx.lineWidth = dpr;
     ctx.beginPath();
-    ctx.arc(size / 2, size / 2, 3.5 * dpr, 0, Math.PI * 2);
+    ctx.arc(offsetX + view.x * scale, offsetZ + view.z * scale, PLAYER_PX * dpr, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
   }

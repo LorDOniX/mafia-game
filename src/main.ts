@@ -89,6 +89,7 @@ async function main(): Promise<void> {
   const crosshair = document.querySelector<HTMLElement>('#crosshair');
   const hud = document.querySelector<HTMLElement>('#hud');
   const minimapCanvas = document.querySelector<HTMLCanvasElement>('#minimap');
+  const bigMapCanvas = document.querySelector<HTMLCanvasElement>('#bigmap');
   const speedometerCanvas = document.querySelector<HTMLCanvasElement>('#speedometer');
   const dayNight = document.querySelector<HTMLButtonElement>('#daynight');
   const clockCanvas = document.querySelector<HTMLCanvasElement>('#clock');
@@ -100,6 +101,7 @@ async function main(): Promise<void> {
     !crosshair ||
     !hud ||
     !minimapCanvas ||
+    !bigMapCanvas ||
     !speedometerCanvas ||
     !dayNight ||
     !clockCanvas
@@ -251,7 +253,7 @@ async function main(): Promise<void> {
     mapColor,
     odometerKm,
     world: {
-      blocked: (x, z, r) => collision.blocked(x, z, r, vehicle),
+      penetration: (x, z, r) => collision.penetration(x, z, r, vehicle),
       groundHeightAt: (x, z) => collision.groundHeightAt(x, z),
     },
   });
@@ -306,6 +308,7 @@ async function main(): Promise<void> {
 
   const drive = new DriveController(camera, input, collision);
   const minimap = new Minimap(minimapCanvas, layout);
+  const bigMap = new Minimap(bigMapCanvas, layout, true);
   const speedometer = new Speedometer(speedometerCanvas);
   const mapCar = (v: Vehicle, color: string): MapCar => ({
     x: v.x,
@@ -324,7 +327,7 @@ async function main(): Promise<void> {
   document.addEventListener('pointerlockchange', () => {
     prompt.textContent = document.pointerLockElement
       ? defaultPrompt
-      : 'Paused \u2014 click to continue';
+      : 'Paused \u2014 press Esc or click to continue';
   });
 
   overlay.hidden = false;
@@ -524,7 +527,7 @@ async function main(): Promise<void> {
     if (pistolKind && !driven && war.alive) {
       instances.push({
         model: pistolKind,
-        transform: viewmodelTransform(camera, PISTOL_MODEL, pistol.kick),
+        transform: viewmodelTransform(camera, PISTOL_MODEL, pistol.kick, pistol.reloadProgress),
       });
     }
     const sun = daylightAt(clock.hour);
@@ -540,29 +543,30 @@ async function main(): Promise<void> {
     const skipLabel = isDay() ? 'Skip to evening (N)' : 'Skip to morning (N)';
     if (dayNight.textContent !== skipLabel) dayNight.textContent = skipLabel;
 
-    minimap.draw(
-      {
-        x: camera.position.x,
-        z: camera.position.z,
-        yaw: camera.yaw,
-        fov: camera.horizontalFov(),
-      },
-      [
-        ...traffic.cars.map((c) => mapCar(c.vehicle, kindOf.get(c)?.entry.mapColor ?? '#cccccc')),
-        ...freeCars.map((c) => mapCar(c.vehicle, c === driven ? PLAYER_CAR_COLOR : c.mapColor)),
-      ],
-      {
-        areas: war.districts
-          .filter((d) => d.contested)
-          .map((d) => ({
-            rect: d.bounds,
-            color: d.captured ? 'rgba(70, 170, 90, 0.22)' : 'rgba(200, 40, 30, 0.25)',
-          })),
-        dots: war.gangsters
-          .filter((g) => g.alive)
-          .map((g) => ({ x: g.body.x, z: g.body.z, color: '#ff3b30' })),
-      },
-    );
+    const mapView = {
+      x: camera.position.x,
+      z: camera.position.z,
+      yaw: camera.yaw,
+      fov: camera.horizontalFov(),
+    };
+    const mapCars = [
+      ...traffic.cars.map((c) => mapCar(c.vehicle, kindOf.get(c)?.entry.mapColor ?? '#cccccc')),
+      ...freeCars.map((c) => mapCar(c.vehicle, c === driven ? PLAYER_CAR_COLOR : c.mapColor)),
+    ];
+    const mapMarks = {
+      areas: war.districts
+        .filter((d) => d.contested)
+        .map((d) => ({
+          rect: d.bounds,
+          color: d.captured ? 'rgba(70, 170, 90, 0.22)' : 'rgba(200, 40, 30, 0.25)',
+        })),
+      dots: war.gangsters
+        .filter((g) => g.alive)
+        .map((g) => ({ x: g.body.x, z: g.body.z, color: '#ff3b30' })),
+    };
+    minimap.draw(mapView, mapCars, mapMarks);
+    bigMapCanvas.hidden = paused || !input.isDown('Tab');
+    if (!bigMapCanvas.hidden) bigMap.draw(mapView, mapCars, mapMarks);
 
     combatHud.update(
       {

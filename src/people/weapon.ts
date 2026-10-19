@@ -4,6 +4,7 @@ import {
   multiply,
   rotationX,
   rotationY,
+  rotationZ,
   scaling,
   translate,
   type Mat4,
@@ -26,16 +27,26 @@ const HOLD = { right: 0.16, down: 0.16, ahead: 0.4 };
 /**
  * Pistole z pohledu první osoby, pevně spojená s kamerou. Rotace o pi - yaw
  * natočí +Z do směru vpřed kamery a +X modelu pak leží nalevo od ní.
+ * `reload` je průběh přebíjení 0..1: pistole klesá, zvedá hlaveň a naklání se, pak se vrátí.
  */
-export function viewmodelTransform(camera: Camera, weapon: WeaponModel, kick: number): Mat4 {
+export function viewmodelTransform(
+  camera: Camera,
+  weapon: WeaponModel,
+  kick: number,
+  reload = 0,
+): Mat4 {
   const { x, y, z } = camera.position;
   const view = multiply(
     multiply(translate(x, y, z), rotationY(Math.PI - camera.yaw)),
     rotationX(-camera.pitch),
   );
+  const dip = Math.sin(Math.PI * reload);
   const held = multiply(
-    translate(-HOLD.right, -HOLD.down + kick * 0.02, HOLD.ahead - kick * 0.06),
-    rotationX(-kick * 0.25),
+    multiply(
+      translate(-HOLD.right, -HOLD.down + kick * 0.02 - dip * 0.1, HOLD.ahead - kick * 0.06),
+      rotationX(-kick * 0.25 - dip * 0.6),
+    ),
+    rotationZ(dip * 0.5),
   );
   return multiply(multiply(multiply(view, held), scaling(weapon.scale)), barrelForward(weapon));
 }

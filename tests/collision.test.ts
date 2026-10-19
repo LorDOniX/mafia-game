@@ -72,6 +72,19 @@ describe('CityCollision.resolve', () => {
     expect(result.x).toBeGreaterThanOrEqual(city.bounds.minX);
     expect(result.z).toBeGreaterThanOrEqual(city.bounds.minZ);
   });
+
+  it('lets the player walk out of a car that ran into them, but not further in', () => {
+    const x = city.pitch;
+    const z = city.pitch * 2;
+    const world = new CityCollision(city);
+    // Auto podél Z, hráč vězí v jeho levém boku.
+    world.setObstacles([
+      { x: x + 1, z, heading: 0, halfLength: 2.2, halfWidth: 0.9, owner: 'car' },
+    ]);
+
+    expect(world.resolve(x, z, x - 0.1, z, RADIUS).x).toBeCloseTo(x - 0.1);
+    expect(world.resolve(x, z, x + 0.1, z, RADIUS).x).toBe(x);
+  });
 });
 
 describe('CityCollision.groundHeightAt', () => {

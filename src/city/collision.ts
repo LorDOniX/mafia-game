@@ -129,11 +129,39 @@ export class CityCollision {
     );
   }
 
+  /** Jak hluboko kruh v (x, z) vězí v něčem pevném nebo za okrajem mapy; 0 = volno. */
+  penetration(x: number, z: number, radius: number, ignore?: unknown): number {
+    const { bounds } = this;
+    return Math.max(
+      this.depth(x, z, radius, ignore),
+      bounds.minX - (x - radius),
+      x + radius - bounds.maxX,
+      bounds.minZ - (z - radius),
+      z + radius - bounds.maxZ,
+    );
+  }
+
+  /** Největší zaboření kruhu do budovy, kmene, sloupu či auta; 0 = nic. */
+  private depth(x: number, z: number, radius: number, ignore?: unknown): number {
+    let deepest = 0;
+    for (const rect of this.candidates(x, z, radius)) {
+      const halfX = (rect.maxX - rect.minX) / 2;
+      const halfZ = (rect.maxZ - rect.minZ) / 2;
+      const local = boxDepth(x - rect.minX - halfX, z - rect.minZ - halfZ, halfX, halfZ, radius);
+      deepest = Math.max(deepest, local);
+    }
+    for (const o of this.obstacles) {
+      if (o.owner !== ignore) deepest = Math.max(deepest, obstacleDepth(x, z, radius, o));
+    }
+    return deepest;
+  }
+
   /**
    * Posune kruh z aktuální pozice směrem k cíli.
    *
    * Každá osa se řeší zvlášť, takže chůze do zdi pod úhlem po ní klouže
-   * místo okamžitého zastavení.
+   * místo okamžitého zastavení. Kruh, do kterého už něco najelo, smí každý
+   * pohyb, který ho nezaboří hlouběji, jinak by z překryvu nikdy nevyležel.
    */
   resolve(
     fromX: number,
@@ -144,9 +172,14 @@ export class CityCollision {
   ): { x: number; z: number } {
     let x = fromX;
     let z = fromZ;
+    const stuck = this.depth(fromX, fromZ, radius);
+    const free = (px: number, pz: number): boolean => {
+      const d = this.depth(px, pz, radius);
+      return d === 0 || d < stuck;
+    };
 
-    if (!this.overlaps(toX, z, radius)) x = toX;
-    if (!this.overlaps(x, toZ, radius)) z = toZ;
+    if (free(toX, z)) x = toX;
+    if (free(x, toZ)) z = toZ;
 
     return {
       x: clamp(x, this.bounds.minX + radius, this.bounds.maxX - radius),
@@ -211,4 +244,23 @@ export function circleHitsObstacle(x: number, z: number, radius: number, o: Obst
   const ax = along - clamp(along, -o.halfLength, o.halfLength);
   const az = across - clamp(across, -o.halfWidth, o.halfWidth);
   return ax * ax + az * az < radius * radius;
+}
+
+function obstacleDepth(x: number, z: number, radius: number, o: Obstacle): number {
+  const dx = x - o.x;
+  const dz = z - o.z;
+  const reach = Math.max(o.halfLength, o.halfWidth) + radius;
+  if (dx * dx + dz * dz > reach * reach) return 0;
+  const along = dx * Math.sin(o.heading) - dz * Math.cos(o.heading);
+  const across = dx * Math.cos(o.heading) + dz * Math.sin(o.heading);
+  return boxDepth(along, across, o.halfLength, o.halfWidth, radius);
+}
+
+/** Zaboření kruhu do boxu se středem v počátku, v souřadnicích boxu. */
+function boxDepth(u: number, v: number, halfU: number, halfV: number, radius: number): number {
+  const outU = Math.abs(u) - halfU;
+  const outV = Math.abs(v) - halfV;
+  // Střed uvnitř: vzdálenost k nejbližší hraně se přičte k poloměru.
+  if (outU <= 0 && outV <= 0) return radius - Math.max(outU, outV);
+  return Math.max(0, radius - Math.hypot(Math.max(outU, 0), Math.max(outV, 0)));
 }
