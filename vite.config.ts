@@ -1,7 +1,9 @@
 import { defineConfig } from 'vite';
 import { fileURLToPath } from 'node:url';
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
+  // build (a vite preview) pro https://app.makuderovi.cz/mafia-game/ (npm run upload), dev server zůstává na http://localhost:5173/
+  base: mode === 'production' ? '/mafia-game/' : '/',
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
@@ -17,4 +19,4 @@ export default defineConfig({
     target: 'es2022',
     sourcemap: true,
   },
-});
+}));

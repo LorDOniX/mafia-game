@@ -6,8 +6,18 @@
  * je zachytitelná chyba místo tiše prázdného povrchu.
  */
 
+/**
+ * Soubory z `public/` mají v kódu absolutní cesty (`/models/car.glb`), hra ale na
+ * serveru běží v podsložce (https://app.makuderovi.cz/mafia-game/). Cesty začínající
+ * `/` proto dostanou prefix podle `base` z vite.config.ts (lokálně `/`, tedy beze změny);
+ * plné URL zůstanou beze změny.
+ */
+export function publicUrl(url: string): string {
+  return url.startsWith('/') && !url.startsWith('//') ? import.meta.env.BASE_URL + url.slice(1) : url;
+}
+
 export async function loadImageBitmap(url: string): Promise<ImageBitmap> {
-  const response = await fetch(url);
+  const response = await fetch(publicUrl(url));
   if (!response.ok) {
     throw new Error(`Failed to load ${url}: HTTP ${response.status}`);
   }

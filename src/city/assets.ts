@@ -27,7 +27,8 @@ import { normalize, type Vec3 } from '@/math/vec3';
  * Toto je jediný soubor, na který je třeba sáhnout při záměně procedurálních textur
  * za stažená PNG. Soubory dejte do `public/`, který Vite servíruje beze změny,
  * a odkazujte na ně absolutní cestou — `public/textures/brick.png` je za běhu
- * `/textures/brick.png`. Neimportujte je ze `src/`: tato cesta přidá do názvu
+ * `/textures/brick.png` (loadery před ni přidají `base` z vite.config.ts, viz
+ * `publicUrl` v gfx/image.ts). Neimportujte je ze `src/`: tato cesta přidá do názvu
  * souboru hash, což nemá smysl u grafiky, na kterou se odkazujete jménem.
  *
  * Každá vynechaná vrstva se vrátí ke své procedurální textuře a URL, které se

@@ -1,6 +1,6 @@
 import { fromTRS, identity, multiply, transformPoint, type Mat4 } from '@/math/mat4';
 import type { Vec3 } from '@/math/vec3';
-import { loadImageBitmap } from './image';
+import { loadImageBitmap, publicUrl } from './image';
 
 /**
  * Minimalistický loader glTF 2.0, pouze binární (.glb).
@@ -70,7 +70,7 @@ export function verticalExtent(model: ModelData): { minY: number; maxY: number }
 }
 
 export async function loadModel(url: string): Promise<LoadedModel> {
-  const response = await fetch(url);
+  const response = await fetch(publicUrl(url));
   if (!response.ok) throw new Error(`Failed to load ${url}: HTTP ${response.status}`);
 
   // Překlep v cestě vrátí HTML fallback Vite se stavem 200, což kontrola
@@ -89,7 +89,7 @@ async function loadModelImage(
     if (image.kind === 'embedded') {
       return await createImageBitmap(new Blob([image.bytes], { type: image.mimeType }));
     }
-    const base = new URL(modelUrl, location.href);
+    const base = new URL(publicUrl(modelUrl), location.href);
     return await loadImageBitmap(new URL(image.uri, base).href);
   } catch (error) {
     console.warn(`Model ${modelUrl}: texture failed to load, drawing it untextured:`, error);

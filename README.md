@@ -40,15 +40,24 @@ A car is parked just ahead of the spawn point. Walk up to it and press `E`:
 
 ## Scripts
 
-| Script              | What it does                     |
-| ------------------- | -------------------------------- |
-| `npm run dev`       | Vite dev server with HMR         |
-| `npm run build`     | Typecheck, then production build |
-| `npm run preview`   | Serve the production build       |
-| `npm run typecheck` | `tsc --noEmit`                   |
-| `npm test`          | Run the Vitest suite once        |
-| `npm run lint`      | ESLint over the repo             |
-| `npm run format`    | Prettier write                   |
+| Script              | What it does                       |
+| ------------------- | ---------------------------------- |
+| `npm run dev`       | Vite dev server with HMR           |
+| `npm run build`     | Typecheck, then production build   |
+| `npm run preview`   | Serve the production build         |
+| `npm run typecheck` | `tsc --noEmit`                     |
+| `npm test`          | Run the Vitest suite once          |
+| `npm run lint`      | ESLint over the repo               |
+| `npm run format`    | Prettier write                     |
+| `npm run upload`    | Build, then upload `dist/` via FTP |
+
+## Deployment
+
+- `npm run upload` builds and uploads `dist/` to FTP `/www/subdom/app/mafia-game/` = https://app.makuderovi.cz/mafia-game/ (`scripts/upload.ts`, same as in the todo repo)
+- FTP access lives in `conf/env.json` (not in git): `{ "ftp": { "host", "user", "password", "secure" } }`
+- only changed files are uploaded (server state in `build-data/upload.json`), files from the previous upload missing in the new build are deleted; `npx tsx scripts/upload.ts --full` re-uploads everything
+- the production build uses `base: '/mafia-game/'` (vite.config.ts), the dev server stays on http://localhost:5173/
+- absolute `public/` paths in code (`/models/car.glb`) get the base prefix in the loaders (`publicUrl` in `src/gfx/image.ts`)
 
 ## Layout
 
